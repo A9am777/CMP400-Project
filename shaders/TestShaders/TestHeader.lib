@@ -1,0 +1,8 @@
+struct OUTPUT
+{
+ float4 Pos : POSITION;
+ float3 View : TEXCOORD0;
+ float3 Normal: TEXCOORD1;
+};
+
+OUTPUT main (float4 pos : POSITION) 
