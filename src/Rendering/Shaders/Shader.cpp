@@ -18,7 +18,7 @@ namespace Haboob
     }
   }
 
-  void Shader::initShader(DisplayDevice* device, const ShaderManager* manager)
+  HRESULT Shader::initShader(DisplayDevice* device, const ShaderManager* manager)
   {
     if (compiledShader)
     {
@@ -26,7 +26,7 @@ namespace Haboob
       compiledShader = nullptr;
     }
 
-    makeShader(&compiledShader, device, manager);
+    return makeShader(&compiledShader, device, manager);
   }
 
   void Shader::bindShader(ID3D11DeviceContext* context)

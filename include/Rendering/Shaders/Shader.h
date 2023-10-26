@@ -22,7 +22,7 @@ namespace Haboob
     Shader(Type shaderType, const wchar_t* path);
     ~Shader();
 
-    void initShader(DisplayDevice* device, const ShaderManager* manager);
+    HRESULT initShader(DisplayDevice* device, const ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context);
 
     protected:
