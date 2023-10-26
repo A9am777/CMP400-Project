@@ -21,10 +21,10 @@ namespace Haboob
     imguiStart();
 
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
-    shaderManager.setShaderDir(L"shaders");
+    shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
 
     // TODO: TEST
-    testShader = new Shader(Shader::Type::Pixel, L"TestShaders/GParticles_ps");
+    testShader = new Shader(Shader::Type::Pixel, L"TestShaders/GParticles");
     testShader->initShader(&device, &shaderManager);
   }
 

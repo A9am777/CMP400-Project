@@ -25,6 +25,9 @@ namespace Haboob
     HRESULT initShader(DisplayDevice* device, const ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context);
 
+    inline Type getType() const { return type; }
+    inline bool isCompiled() const { return compiledShader != nullptr; }
+
     protected:
     HRESULT makeShader(ID3D11DeviceChild** shader, DisplayDevice* device, const ShaderManager* manager);
     void bindVertex(ID3D11DeviceContext* context);
