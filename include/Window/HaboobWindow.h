@@ -5,12 +5,15 @@
 #include <MousePointer.h>
 #include <imgui.h>
 #include "Rendering/D3DCore.h"
-#include "Rendering/RDevice.h"
+#include "Rendering/DisplayDevice.h"
 
 namespace Haboob
 {
   class HaboobWindow : public WSTR::Window
   {
+    using Clock = std::chrono::steady_clock;
+    using Precision = std::micro;
+
     public:
     HaboobWindow();
     ~HaboobWindow();
@@ -25,10 +28,11 @@ namespace Haboob
     virtual void onMove() override;
 
     virtual void input();
-    virtual void render(float dt);
+    virtual void update(float dt);
+    virtual void render();
 
     protected:
-    DVF::RDevice device;
+    DisplayDevice device;
 
     WSTR::VKeys keys;
     WSTR::MousePointer mouse;
@@ -48,6 +52,8 @@ namespace Haboob
     void renderTestGUI();
 
     private:
+    Clock::time_point lastFrame;
+
     ImGuiContext* imgui;
   };
 }

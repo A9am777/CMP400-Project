@@ -23,17 +23,36 @@ namespace Haboob
 
   void HaboobWindow::main()
   {
-    imguiFrameBegin();
-    device.clearBackBuffer();
+    // Determine the time since last frame
+    float dt = 1.f;
+    {
+      Clock::time_point frameStart = Clock::now();
+      dt = std::chrono::duration<float, Precision>(frameStart - lastFrame).count() / float(Precision::den);
+      lastFrame = frameStart;
+    }
 
-    device.setBackBufferTarget();
-    render(0.0f);
-    device.setBackBufferTarget();
-    imguiFrameEnd();
-    keys.clearPresses();
-    mouse.clearEvents();
+    // Handle input
+    {
+      input();
+      keys.clearPresses();
+      mouse.clearEvents();
+    }
 
-    device.swapBuffer();
+    // Update
+    update(dt);
+
+    // Handle rendering
+    {
+      imguiFrameBegin();
+      device.clearBackBuffer();
+
+      device.setBackBufferTarget();
+      render();
+
+      device.setBackBufferTarget();
+      imguiFrameEnd();
+      device.swapBuffer();
+    }
   }
 
   void HaboobWindow::onEnd()
@@ -45,7 +64,7 @@ namespace Haboob
   {
     if (device.getContext())
     {
-      if (device.resize(getWidth(), getHeight()) != S_OK)
+      if (device.resizeBackBuffer(getWidth(), getHeight()) != S_OK)
       {
         std::cout << "UH \n";
       }
@@ -89,7 +108,12 @@ namespace Haboob
 
   }
 
-  void HaboobWindow::render(float dt)
+  void HaboobWindow::update(float dt)
+  {
+
+  }
+
+  void HaboobWindow::render()
   {
     renderTestGUI();
   }
@@ -107,7 +131,7 @@ namespace Haboob
     {
       ImGui::SetCurrentContext(imgui);
       assert(ImGui_ImplWin32_Init(wHandle));
-      assert(ImGui_ImplDX11_Init(device.getDevice(), device.getContext()));
+      assert(ImGui_ImplDX11_Init(device.getDevice().Get(), device.getContext().Get()));
       ImGui::GetIO().Fonts->AddFontDefault();
       ImGui::GetIO().Fonts->Build();
       ImGui_ImplDX11_CreateDeviceObjects();
@@ -189,7 +213,7 @@ namespace Haboob
   {
     if (ImGui::Begin("DEBUGWINDOW", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
-      ImGui::Text("oof dddddddddddddddddd");
+      ImGui::Text("Hello World");
     }
     ImGui::End();
   }
