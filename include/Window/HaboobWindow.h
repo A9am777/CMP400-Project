@@ -6,6 +6,7 @@
 #include <imgui.h>
 #include "Rendering/D3DCore.h"
 #include "Rendering/DisplayDevice.h"
+#include "Rendering/Shaders/Shader.h"
 
 namespace Haboob
 {
@@ -51,6 +52,8 @@ namespace Haboob
 
     void renderTestGUI();
 
+    Shader* testShader;
+    ShaderManager shaderManager;
     private:
     Clock::time_point lastFrame;
 

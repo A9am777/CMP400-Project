@@ -19,6 +19,13 @@ namespace Haboob
     Window::onStart();
     createD3D();
     imguiStart();
+
+    shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
+    shaderManager.setShaderDir(L"shaders");
+
+    // TODO: TEST
+    testShader = new Shader(Shader::Type::Pixel, L"TestShaders/GParticles_ps");
+    testShader->initShader(&device, &shaderManager);
   }
 
   void HaboobWindow::main()
@@ -120,7 +127,7 @@ namespace Haboob
 
   void HaboobWindow::createD3D()
   {
-    device.create();
+    device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT, { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 });
     device.makeSwapChain(wHandle);
     device.makeBackBuffer();
   }
