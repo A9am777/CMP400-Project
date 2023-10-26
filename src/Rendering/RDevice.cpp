@@ -56,7 +56,7 @@ HRESULT RDevice::makeSwapChain(HWND context, DXGI_FORMAT bufferFormat)
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.SampleDesc.Count = 1;
     desc.SampleDesc.Quality = 0;
-    desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+    desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
     desc.OutputWindow = context;
 
     return makeSwapChain(context, desc);
