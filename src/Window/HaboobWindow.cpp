@@ -24,8 +24,11 @@ namespace Haboob
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
 
     // TODO: TEST
-    testShader = new Shader(Shader::Type::Pixel, L"TestShaders/GParticles");
-    testShader->initShader(&device, &shaderManager);
+    testVertexShader = new Shader(Shader::Type::Vertex, L"TestShaders/MeshShaderV");
+    testPixelShader = new Shader(Shader::Type::Pixel, L"TestShaders/MeshShaderP");
+    testVertexShader->initShader(&device, &shaderManager);
+    testPixelShader->initShader(&device, &shaderManager);
+    cubeMesh.build(device.getDevice().Get());
   }
 
   void HaboobWindow::main()
@@ -53,6 +56,7 @@ namespace Haboob
       imguiFrameBegin();
       device.clearBackBuffer();
 
+      device.setDepthEnabled(true);
       device.setBackBufferTarget();
       render();
 
@@ -71,13 +75,9 @@ namespace Haboob
   {
     if (device.getContext())
     {
-      if (device.resizeBackBuffer(getWidth(), getHeight()) != S_OK)
-      {
-        std::cout << "UH \n";
-      }
+      assert(device.resizeBackBuffer(getWidth(), getHeight()) == S_OK);
     }
 
-    
     RECT rect;
     GetClientRect(wHandle, &rect);
     InvalidateRect(wHandle, &rect, TRUE);
@@ -122,6 +122,12 @@ namespace Haboob
 
   void HaboobWindow::render()
   {
+    ID3D11DeviceContext* context = device.getContext().Get();
+    testVertexShader->bindShader(context);
+    testPixelShader->bindShader(context);
+    cubeMesh.useBuffers(context);
+    cubeMesh.draw(context);
+
     renderTestGUI();
   }
 
@@ -129,7 +135,8 @@ namespace Haboob
   {
     device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT, { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 });
     device.makeSwapChain(wHandle);
-    device.makeBackBuffer();
+    device.resizeBackBuffer(getWidth(), getHeight());
+    device.makeDepthStates();
   }
 
   void HaboobWindow::imguiStart()

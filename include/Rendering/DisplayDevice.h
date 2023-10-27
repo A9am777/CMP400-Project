@@ -14,10 +14,13 @@ namespace Haboob
     HRESULT makeSwapChain(HWND context, DXGI_FORMAT bufferFormat = DXGI_FORMAT_B8G8R8A8_UNORM);
     HRESULT makeSwapChain(HWND context, DXGI_SWAP_CHAIN_DESC& desc);
 
+    HRESULT makeDepthStates();
     HRESULT makeBackBuffer();
     HRESULT resizeBackBuffer(size_t width, size_t height);
     void clearBackBuffer();
     void setBackBufferTarget();
+
+    void setDepthEnabled(bool useDepth);
 
     // Swaps the back buffer to screen
     HRESULT swapBuffer(UINT flags = NULL);
@@ -29,6 +32,8 @@ namespace Haboob
     private:
     static std::vector<D3D_FEATURE_LEVEL> defaultFeatureLevels;
 
+    HRESULT makeDepthBuffer();
+
     // Device
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> deviceContext;
@@ -39,5 +44,9 @@ namespace Haboob
     ComPtr<ID3D11Texture2D> backBufferTexture;
     ComPtr<ID3D11RenderTargetView> backBufferTarget;
     D3D11_VIEWPORT backBufferViewport;
+    ComPtr<ID3D11Texture2D> depthBufferTexture;
+    ComPtr<ID3D11DepthStencilView> depthBufferView;
+    ComPtr<ID3D11DepthStencilState> depthEnabledState;
+    ComPtr<ID3D11DepthStencilState> depthDisabledState;
   };
 }

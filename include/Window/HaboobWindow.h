@@ -7,6 +7,7 @@
 #include "Rendering/D3DCore.h"
 #include "Rendering/DisplayDevice.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/Geometry/SimpleMeshes.h"
 
 namespace Haboob
 {
@@ -52,7 +53,9 @@ namespace Haboob
 
     void renderTestGUI();
 
-    Shader* testShader;
+    SimpleCubeMesh cubeMesh;
+    Shader* testVertexShader;
+    Shader* testPixelShader;
     ShaderManager shaderManager;
     private:
     Clock::time_point lastFrame;
