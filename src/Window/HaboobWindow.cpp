@@ -3,6 +3,8 @@
 #include <backends/imgui_impl_dx11.h>
 #include <backends/imgui_impl_win32.h>
 
+#include "Rendering/Scene/SceneStructs.h"
+
 namespace Haboob
 {
   HaboobWindow::HaboobWindow() : imgui{ nullptr }
@@ -29,6 +31,21 @@ namespace Haboob
     testVertexShader->initShader(&device, &shaderManager);
     testPixelShader->initShader(&device, &shaderManager);
     cubeMesh.build(device.getDevice().Get());
+
+    // TEST
+    {
+      D3D11_BUFFER_DESC cameraBufferDesc;
+      HRESULT result = S_OK; // unused
+      cameraBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+      cameraBufferDesc.ByteWidth = sizeof(CameraPack);
+      cameraBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+      cameraBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      cameraBufferDesc.MiscFlags = 0;
+      cameraBufferDesc.StructureByteStride = 0;
+      result = device.getDevice()->CreateBuffer(&cameraBufferDesc, NULL, cameraBuffer.GetAddressOf());
+    }
+
+    lastFrame = Clock::now();
   }
 
   void HaboobWindow::main()
@@ -43,7 +60,7 @@ namespace Haboob
 
     // Handle input
     {
-      input();
+      input(dt);
       keys.clearPresses();
       mouse.clearEvents();
     }
@@ -56,6 +73,7 @@ namespace Haboob
       imguiFrameBegin();
       device.clearBackBuffer();
 
+      device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
       device.setDepthEnabled(true);
       device.setBackBufferTarget();
       render();
@@ -78,6 +96,8 @@ namespace Haboob
       assert(device.resizeBackBuffer(getWidth(), getHeight()) == S_OK);
     }
 
+    adjustProjection();
+
     RECT rect;
     GetClientRect(wHandle, &rect);
     InvalidateRect(wHandle, &rect, TRUE);
@@ -85,58 +105,91 @@ namespace Haboob
     imguiFrameResize();
   }
 
-  void HaboobWindow::onKeyDown(char vKey)
+  void HaboobWindow::onKeyDown(unsigned char vKey)
   {
     keys.keyDown(vKey);
-    imguiKeyDown(vKey);
   }
 
-  void HaboobWindow::onKeyUp(char vKey)
+  void HaboobWindow::onKeyUp(unsigned char vKey)
   {
     keys.keyUp(vKey);
-    imguiKeyUp(vKey);
   }
 
   void HaboobWindow::onMouseMove(short x, short y)
   {
     mouse.onMouseMove(x, y);
-    imguiMouseMove(x, y);
   }
 
   void HaboobWindow::onMove()
   {
-    imguiMove();
+
   }
 
-  void HaboobWindow::input()
+  void HaboobWindow::input(float dt)
   {
     if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) { return; }
 
-
+    camTest.update(dt, &keys, &mouse);
   }
 
   void HaboobWindow::update(float dt)
   {
-
+    
   }
 
   void HaboobWindow::render()
   {
+
     ID3D11DeviceContext* context = device.getContext().Get();
-    testVertexShader->bindShader(context);
-    testPixelShader->bindShader(context);
-    cubeMesh.useBuffers(context);
-    cubeMesh.draw(context);
+
+    // TEST
+    {
+      testVertexShader->bindShader(context);
+      testPixelShader->bindShader(context);
+
+      camTest.setWorld(XMMatrixIdentity() * XMMatrixTranslation(cubePos[0], cubePos[1], cubePos[2]));
+
+      // Camera data
+      {
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        HRESULT result = context->Map(cameraBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        camTest.putPack(mapped.pData);
+        context->Unmap(cameraBuffer.Get(), 0);
+      }
+      context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
+
+      cubeMesh.useBuffers(context);
+      cubeMesh.draw(context);
+    }
 
     renderTestGUI();
   }
 
   void HaboobWindow::createD3D()
   {
-    device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT, { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 });
-    device.makeSwapChain(wHandle);
-    device.resizeBackBuffer(getWidth(), getHeight());
-    device.makeDepthStates();
+    assert(!FAILED(device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT, { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 })));
+    assert(!FAILED(device.makeSwapChain(wHandle)));
+    assert(!FAILED(device.resizeBackBuffer(getWidth(), getHeight())));
+    assert(!FAILED(device.makeStates()));
+
+    mainRasterMode = static_cast<UInt>(device.getRasterState());
+    adjustProjection();
+  }
+
+  void HaboobWindow::adjustProjection()
+  {
+    // Setup the projection matrix.
+    float fov = (float)XM_PIDIV4;
+    float screenAspect = float(getWidth()) / float(getHeight());
+
+    float nearZ = .1f;
+    float farZ = 100.f;
+    camTest.setProjection(XMMatrixPerspectiveFovLH(fov, screenAspect, nearZ, farZ));
+  }
+
+  LRESULT HaboobWindow::customRoutine(UINT message, WPARAM wParam, LPARAM lParam)
+  {
+    return ImGui_ImplWin32_WndProcHandler(wHandle, message, wParam, lParam);
   }
 
   void HaboobWindow::imguiStart()
@@ -187,47 +240,25 @@ namespace Haboob
     }
   }
 
-  void HaboobWindow::imguiKeyDown(char vKey)
-  {
-    switch (vKey)
-    {
-      case VK_LBUTTON:
-        ImGui::GetIO().AddMouseButtonEvent(0, true);
-        break;
-    }
-  }
-
-  void HaboobWindow::imguiKeyUp(char vKey)
-  {
-    switch (vKey)
-    {
-      case VK_LBUTTON:
-        ImGui::GetIO().AddMouseButtonEvent(0, false);
-        break;
-    }
-  }
-
-  void HaboobWindow::imguiMouseMove(short x, short y)
-  {
-    if (imgui)
-    {
-      ImGui::GetIO().MousePos = { float(x), float(y) };
-    }
-  }
-
-  void HaboobWindow::imguiMove()
-  {
-    if (imgui)
-    {
-      ImGui::SetNextWindowPos(ImVec2{ float(getX()), float(getY()) });
-    }
-  }
-
   void HaboobWindow::renderTestGUI()
   {
     if (ImGui::Begin("DEBUGWINDOW", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
       ImGui::Text("Hello World");
+      ImGui::DragFloat3("Cube Pos", cubePos, 1.f, -10.f, 10.f);
+
+      if (ImGui::CollapsingHeader("Camera"))
+      {
+        ImGui::DragFloat3("Camera Pos", &camTest.getPosition().x, 1.f, -10.f, 10.f);
+        ImGui::DragFloat2("Camera Rot", &camTest.getAngles().x, XM_PI * .01f, -XM_PI, XM_PI);
+      }
+
+      if (ImGui::CollapsingHeader("Raster State"))
+      {
+        ImGui::CheckboxFlags("Solid/Wireframe", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_SOLID);
+        ImGui::CheckboxFlags("Cull", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_CULL);
+        ImGui::CheckboxFlags("Backface/Frontface", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_BACK);
+      }
     }
     ImGui::End();
   }

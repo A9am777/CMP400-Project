@@ -22,7 +22,7 @@ namespace Haboob
   {
     if (device || deviceContext) { return NTE_EXISTS; }
     HRESULT result = S_OK;
-    #if Debug
+    #if DEBUGFLAG
     flags |= D3D11_CREATE_DEVICE_DEBUG;
     #endif
 
@@ -159,9 +159,33 @@ namespace Haboob
     deviceContext->OMSetDepthStencilState(useDepth ? depthEnabledState.Get() : depthDisabledState.Get(), 1);
   }
 
+  void DisplayDevice::setWireframe(bool isWireframe)
+  {
+    setRasterState(isWireframe ? BitClear(rasterState, RASTER_FLAG_SOLID) : BitSet(rasterState, RASTER_FLAG_SOLID));
+  }
+
+  void DisplayDevice::setCull(bool isCull)
+  {
+    setRasterState(isCull ? BitSet(rasterState, RASTER_FLAG_CULL) : BitClear(rasterState, RASTER_FLAG_CULL));
+  }
+
+  void DisplayDevice::setCullBackface(bool isCullBack)
+  {
+    setRasterState(isCullBack ? BitSet(rasterState, RASTER_FLAG_BACK) : BitClear(rasterState, RASTER_FLAG_BACK));
+  }
+
   HRESULT DisplayDevice::swapBuffer(UINT flags)
   {
     return swapChain->Present(1, flags);
+  }
+
+  void DisplayDevice::setRasterState(RasterFlags newState, bool force)
+  {
+    if (newState != rasterState || force)
+    {
+      rasterState = newState;
+      deviceContext->RSSetState(rasterStates[rasterState].Get());
+    }
   }
 
   HRESULT DisplayDevice::makeDepthBuffer()
@@ -185,7 +209,7 @@ namespace Haboob
       depthBufferDesc.CPUAccessFlags = 0;
       depthBufferDesc.MiscFlags = 0;
 
-      result = device->CreateTexture2D(&depthBufferDesc, NULL, &depthBufferTexture);
+      result = device->CreateTexture2D(&depthBufferDesc, NULL, depthBufferTexture.GetAddressOf());
     }
     Firebreak(result);
 
@@ -198,21 +222,21 @@ namespace Haboob
       depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
       depthViewDesc.Texture2D.MipSlice = 0;
 
-      result = device->CreateDepthStencilView(depthBufferTexture.Get(), &depthViewDesc, &depthBufferView);
+      result = device->CreateDepthStencilView(depthBufferTexture.Get(), &depthViewDesc, depthBufferView.GetAddressOf());
     }
 
     return result;
   }
 
-  HRESULT DisplayDevice::makeDepthStates()
+  HRESULT DisplayDevice::makeStates()
   {
     HRESULT result = S_OK;
 
-    D3D11_DEPTH_STENCIL_DESC depthStateDesc;
-    ZeroMemory(&depthStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
-
-    // Enabled state
+    // Create depth states
     {
+      D3D11_DEPTH_STENCIL_DESC depthStateDesc;
+      ZeroMemory(&depthStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
       depthStateDesc.DepthEnable = true;
       depthStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
       depthStateDesc.DepthFunc = D3D11_COMPARISON_LESS;
@@ -228,15 +252,46 @@ namespace Haboob
       depthStateDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
       depthStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 
+      // Enabled state
       result = device->CreateDepthStencilState(&depthStateDesc, &depthEnabledState);
-    }
-    Firebreak(result);
+      Firebreak(result);
 
-    // Disabled state
-    {
+      // Disabled state
       depthStateDesc.DepthEnable = false;
       result = device->CreateDepthStencilState(&depthStateDesc, &depthDisabledState);
+      Firebreak(result);
     }
+
+    // Create raster states
+    {
+      D3D11_RASTERIZER_DESC rasterDesc;
+      ZeroMemory(&rasterDesc, sizeof(D3D11_RASTERIZER_DESC));
+
+      rasterDesc.AntialiasedLineEnable = false;
+      rasterDesc.CullMode = D3D11_CULL_BACK;
+      rasterDesc.DepthClipEnable = true;
+      rasterDesc.FillMode = D3D11_FILL_SOLID;
+      rasterDesc.FrontCounterClockwise = true;
+      rasterDesc.MultisampleEnable = false;
+      rasterDesc.ScissorEnable = false;
+
+      // Cache each possible permutation
+      for (Byte bitState = 0; bitState < RASTER_STATE_COUNT; ++bitState)
+      {
+        auto state = static_cast<RasterFlags>(bitState);
+        bool solid = BitMask(state, RASTER_FLAG_SOLID);
+        bool cull = BitMask(state, RASTER_FLAG_CULL);
+        bool backFace = BitMask(state, RASTER_FLAG_BACK);
+
+        rasterDesc.FillMode = solid ? D3D11_FILL_SOLID : D3D11_FILL_WIREFRAME;
+        rasterDesc.CullMode = backFace ? D3D11_CULL_BACK : D3D11_CULL_FRONT;
+        rasterDesc.CullMode = cull ? rasterDesc.CullMode : D3D11_CULL_NONE;
+
+        result = device->CreateRasterizerState(&rasterDesc, rasterStates[bitState].GetAddressOf());
+        Firebreak(result);
+      }
+    }
+    setRasterState(RASTER_STATE_DEFAULT, true);
 
     return result;
   }

@@ -8,6 +8,9 @@
 #include "Rendering/DisplayDevice.h"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Geometry/SimpleMeshes.h"
+#include "Rendering/Scene/FreeCam.h"
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace Haboob
 {
@@ -24,12 +27,12 @@ namespace Haboob
     virtual void main() override;
     virtual void onEnd() override;
     virtual void onResize() override;
-    virtual void onKeyDown(char vKey) override;
-    virtual void onKeyUp(char vKey) override;
+    virtual void onKeyDown(unsigned char vKey) override;
+    virtual void onKeyUp(unsigned char vKey) override;
     virtual void onMouseMove(short x, short y) override;
     virtual void onMove() override;
 
-    virtual void input();
+    virtual void input(float dt);
     virtual void update(float dt);
     virtual void render();
 
@@ -40,16 +43,15 @@ namespace Haboob
     WSTR::MousePointer mouse;
 
     void createD3D();
+    void adjustProjection();
+
+    LRESULT customRoutine(UINT message, WPARAM wParam, LPARAM lParam) override;
 
     void imguiStart();
     void imguiEnd();
     void imguiFrameBegin();
     void imguiFrameEnd();
     void imguiFrameResize();
-    void imguiKeyDown(char vKey);
-    void imguiKeyUp(char vKey);
-    void imguiMouseMove(short x, short y);
-    void imguiMove();
 
     void renderTestGUI();
 
@@ -57,9 +59,19 @@ namespace Haboob
     Shader* testVertexShader;
     Shader* testPixelShader;
     ShaderManager shaderManager;
+
+    // TEST
+    XMMATRIX projectionMatrix;
+    XMMATRIX worldMatrix;
+    XMMATRIX viewMatrix;
+    FreeCam camTest;
+    ComPtr<ID3D11Buffer> cameraBuffer;
     private:
     Clock::time_point lastFrame;
 
+    // ImGui
+    float cubePos[3] = {.0f, .0f, 2.5f};
+    UInt mainRasterMode;
     ImGuiContext* imgui;
   };
 }

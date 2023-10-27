@@ -20,7 +20,7 @@ using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
 // Useful utils
-#define Debug (DEBUG || _DEBUG)
+#define DEBUGFLAG (DEBUG || _DEBUG)
 #define Firebreak(result) if(FAILED(result)) { return result; }
 #define FirebreakClear(result, clear) if(FAILED(result)) { clear->Release(); return result; }
 
