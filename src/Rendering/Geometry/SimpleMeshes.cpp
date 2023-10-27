@@ -13,10 +13,10 @@ namespace Haboob
       {{scale, scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
       {{-scale, scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
       // Bottom
-      {{-scale, -scale, -scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
       {{scale, -scale, -scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
-      {{scale, -scale, scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
+      {{-scale, -scale, -scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
       {{-scale, -scale, scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
+      {{scale, -scale, scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
       // Right
       {{scale, -scale, -scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
       {{scale, -scale, scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
@@ -28,10 +28,10 @@ namespace Haboob
       {{scale, scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
       {{-scale, scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
       // Top
-      {{-scale, scale, -scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
       {{scale, scale, -scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
-      {{scale, scale, scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
+      {{-scale, scale, -scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
       {{-scale, scale, scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
+      {{scale, scale, scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
       // Left
       {{-scale, -scale, -scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}},
       {{-scale, -scale, scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}},
