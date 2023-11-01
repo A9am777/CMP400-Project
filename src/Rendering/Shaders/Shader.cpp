@@ -54,6 +54,11 @@ namespace Haboob
     }
   }
 
+  void Shader::dispatch(ID3D11DeviceContext* context, UInt groupX, UInt groupY, UInt groupZ)
+  {
+    context->Dispatch(groupX, groupY, groupZ);
+  }
+
   HRESULT Shader::makeShader(ID3D11DeviceChild** shader, DisplayDevice* device, const ShaderManager* manager)
   {
     HRESULT result = S_OK;

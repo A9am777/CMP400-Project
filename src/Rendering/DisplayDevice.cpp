@@ -4,6 +4,8 @@ namespace Haboob
 {
   std::vector<D3D_FEATURE_LEVEL> DisplayDevice::defaultFeatureLevels = std::vector<D3D_FEATURE_LEVEL>(
   {
+    D3D_FEATURE_LEVEL_12_1,
+    D3D_FEATURE_LEVEL_12_0,
     D3D_FEATURE_LEVEL_11_1,
     D3D_FEATURE_LEVEL_11_0,
     D3D_FEATURE_LEVEL_10_1,
@@ -13,7 +15,7 @@ namespace Haboob
     D3D_FEATURE_LEVEL_9_1,
   });
 
-  DisplayDevice::DisplayDevice() : featureLevel{D3D_FEATURE_LEVEL_1_0_CORE}, backBufferViewport{}
+  DisplayDevice::DisplayDevice() : featureLevel{D3D_FEATURE_LEVEL_1_0_CORE}, backBufferViewport{}, rasterState{RASTER_STATE_DEFAULT}
   {
 
   }

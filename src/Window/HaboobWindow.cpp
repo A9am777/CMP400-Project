@@ -167,7 +167,7 @@ namespace Haboob
 
   void HaboobWindow::createD3D()
   {
-    assert(!FAILED(device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT, { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 })));
+    assert(!FAILED(device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT)));
     assert(!FAILED(device.makeSwapChain(wHandle)));
     assert(!FAILED(device.resizeBackBuffer(getWidth(), getHeight())));
     assert(!FAILED(device.makeStates()));
