@@ -19,8 +19,12 @@ namespace Haboob
     // Renders from this target to the currently bound target
     void renderFrom(ID3D11DeviceContext* context);
 
-    inline const ID3D11RenderTargetView* getRenderTarget() const { return textureTarget.Get(); }
-    inline const ID3D11ShaderResourceView* getShaderView() const { return textureShaderView.Get(); }
+    inline UINT getWidth() const { return textureViewport.Width; }
+    inline UINT getHeight() const { return textureViewport.Height; }
+
+    inline ID3D11RenderTargetView* getRenderTarget() { return textureTarget.Get(); }
+    inline ID3D11ShaderResourceView* getShaderView() { return textureShaderView.Get(); }
+    inline ID3D11UnorderedAccessView* getComputeView() { return computeAccessView.Get(); }
 
     static RenderCopyShader copyShader;
     protected:
@@ -31,6 +35,7 @@ namespace Haboob
     ComPtr<ID3D11Texture2D> texture;
     ComPtr<ID3D11RenderTargetView> textureTarget;
     ComPtr<ID3D11ShaderResourceView> textureShaderView;
+    ComPtr<ID3D11UnorderedAccessView> computeAccessView;
     D3D11_VIEWPORT textureViewport;
   };
 }

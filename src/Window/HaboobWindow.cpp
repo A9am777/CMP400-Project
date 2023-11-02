@@ -29,12 +29,14 @@ namespace Haboob
     {
       ID3D11Device* dev = device.getDevice().Get();
 
-      renderTarget.create(dev, getWidth(), getHeight());
+      mainRender.create(dev, getWidth(), getHeight());
 
       testVertexShader = new Shader(Shader::Type::Vertex, L"TestShaders/MeshShaderV");
       testPixelShader = new Shader(Shader::Type::Pixel, L"TestShaders/MeshShaderP");
+      testComputeShader = new Shader(Shader::Type::Compute, L"TestShaders/TestComputeScreenDraw");
       testVertexShader->initShader(dev, &shaderManager);
       testPixelShader->initShader(dev, &shaderManager);
+      testComputeShader->initShader(dev, &shaderManager);
       testMesh.build(dev);
 
       RenderTarget::copyShader.initShader(dev, &shaderManager);
@@ -80,18 +82,12 @@ namespace Haboob
     {
       imguiFrameBegin();
 
-      device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
-      device.setDepthEnabled(true);
-      renderTarget.clear(device.getContext().Get());
-      renderTarget.setTarget(device.getContext().Get(), device.getDepthBuffer());
+      renderBegin();
       render();
+      renderOverlay();
+      renderMirror();
 
-      device.clearBackBuffer();
-      device.setBackBufferTarget();
-      device.setRasterState(DisplayDevice::RasterFlags::RASTER_STATE_DEFAULT);
-      device.setDepthEnabled(false);
-      RenderTarget::copyShader.setProjectionMatrix(device.getOrthoMatrix());
-      renderTarget.renderFrom(device.getContext().Get());
+      renderTestGUI();
 
       imguiFrameEnd();
       device.swapBuffer();
@@ -153,7 +149,6 @@ namespace Haboob
 
   void HaboobWindow::render()
   {
-
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // TEST
@@ -175,8 +170,6 @@ namespace Haboob
       testMesh.useBuffers(context);
       testMesh.draw(context);
     }
-
-    renderTestGUI();
   }
 
   void HaboobWindow::createD3D()
@@ -192,7 +185,7 @@ namespace Haboob
 
   void HaboobWindow::adjustProjection()
   {
-    renderTarget.resize(device.getDevice().Get(), getWidth(), getHeight());
+    mainRender.resize(device.getDevice().Get(), getWidth(), getHeight());
 
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
@@ -206,6 +199,37 @@ namespace Haboob
   LRESULT HaboobWindow::customRoutine(UINT message, WPARAM wParam, LPARAM lParam)
   {
     return ImGui_ImplWin32_WndProcHandler(wHandle, message, wParam, lParam);
+  }
+
+  void HaboobWindow::renderBegin()
+  {
+    // Render to the main target using vanilla settings
+    device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
+    device.setDepthEnabled(true);
+    mainRender.clear(device.getContext().Get());
+    mainRender.setTarget(device.getContext().Get(), device.getDepthBuffer());
+  }
+
+  void HaboobWindow::renderOverlay()
+  {
+    ID3D11DeviceContext* context = device.getContext().Get();
+    device.setBackBufferTarget();
+    testComputeShader->bindShader(context);
+    ID3D11UnorderedAccessView* accessView = mainRender.getComputeView();
+    context->CSSetUnorderedAccessViews(0, 1, &accessView, 0);
+    testComputeShader->dispatch(context, mainRender.getWidth(), mainRender.getHeight(), 1);
+    accessView = nullptr;
+    context->CSSetUnorderedAccessViews(0, 1, &accessView, 0);
+  }
+
+  void HaboobWindow::renderMirror()
+  {
+    device.clearBackBuffer();
+    device.setBackBufferTarget();
+    device.setRasterState(DisplayDevice::RasterFlags::RASTER_STATE_DEFAULT);
+    device.setDepthEnabled(false);
+    RenderTarget::copyShader.setProjectionMatrix(device.getOrthoMatrix());
+    mainRender.renderFrom(device.getContext().Get());
   }
 
   void HaboobWindow::imguiStart()

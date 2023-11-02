@@ -10,7 +10,7 @@ namespace Haboob
     DXGI_FORMAT_R32G32B32A32_FLOAT,
     {1, 0},
     D3D11_USAGE_DEFAULT,
-    D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
+    D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS,
     0,
     0 
   };
@@ -85,6 +85,18 @@ namespace Haboob
       shaderViewDesc.Texture2D.MipLevels = 1;
 
       result = device->CreateShaderResourceView(texture.Get(), &shaderViewDesc, textureShaderView.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
+    // Create the compute unordered access view
+    {
+      D3D11_UNORDERED_ACCESS_VIEW_DESC computeAccessDesc;
+      ZeroMemory(&computeAccessDesc, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
+      computeAccessDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+      computeAccessDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+      computeAccessDesc.Texture2D.MipSlice = 0;
+
+      result = device->CreateUnorderedAccessView(texture.Get(), &computeAccessDesc, computeAccessView.ReleaseAndGetAddressOf());
       Firebreak(result);
     }
 

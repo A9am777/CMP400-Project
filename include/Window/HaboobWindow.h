@@ -48,6 +48,10 @@ namespace Haboob
 
     LRESULT customRoutine(UINT message, WPARAM wParam, LPARAM lParam) override;
 
+    void renderBegin();
+    void renderOverlay(); // Raymarch environment
+    void renderMirror(); // Copies from mainRender to the back buffer
+
     void imguiStart();
     void imguiEnd();
     void imguiFrameBegin();
@@ -59,6 +63,7 @@ namespace Haboob
     SimpleSphereMesh testMesh;
     Shader* testVertexShader;
     Shader* testPixelShader;
+    Shader* testComputeShader;
     ShaderManager shaderManager;
 
     // TEST
@@ -66,7 +71,7 @@ namespace Haboob
     XMMATRIX worldMatrix;
     XMMATRIX viewMatrix;
     FreeCam camTest;
-    RenderTarget renderTarget;
+    RenderTarget mainRender;
     ComPtr<ID3D11Buffer> cameraBuffer;
     private:
     Clock::time_point lastFrame;
