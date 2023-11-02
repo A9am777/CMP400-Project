@@ -1,6 +1,8 @@
 #ifndef MESHCOMMON_H
 #define MESHCOMMON_H
 
+#include "../Utility/Globals.lib"
+
 struct CameraBuffer
 {
   matrix worldMatrix;

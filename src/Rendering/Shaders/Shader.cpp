@@ -130,5 +130,4 @@ namespace Haboob
   {
     context->CSSetShader(reinterpret_cast<ID3D11ComputeShader*>(compiledShader), NULL, 0);
   }
-
 }
