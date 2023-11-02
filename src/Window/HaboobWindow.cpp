@@ -217,7 +217,7 @@ namespace Haboob
     testComputeShader->bindShader(context);
     ID3D11UnorderedAccessView* accessView = mainRender.getComputeView();
     context->CSSetUnorderedAccessViews(0, 1, &accessView, 0);
-    testComputeShader->dispatch(context, mainRender.getWidth(), mainRender.getHeight(), 1);
+    testComputeShader->dispatch(context, mainRender.getWidth(), mainRender.getHeight());
     accessView = nullptr;
     context->CSSetUnorderedAccessViews(0, 1, &accessView, 0);
   }
