@@ -55,7 +55,7 @@ namespace Haboob
 
     void renderTestGUI();
 
-    SimpleCubeMesh cubeMesh;
+    SimpleSphereMesh testMesh;
     Shader* testVertexShader;
     Shader* testPixelShader;
     ShaderManager shaderManager;

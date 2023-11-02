@@ -1,4 +1,5 @@
 #pragma once
+#include "Data/Defs.h"
 #include "Rendering/D3DCore.h"
 
 #include <vector>
@@ -14,7 +15,7 @@ namespace Haboob
 		void useBuffers(ID3D11DeviceContext* context, D3D_PRIMITIVE_TOPOLOGY primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		protected:
-    HRESULT buildBuffers(ID3D11Device* device, const std::vector<VertexT>& vertices, const std::vector<unsigned long>& indices);
+    HRESULT buildBuffers(ID3D11Device* device, const std::vector<VertexT>& vertices, const std::vector<ULong>& indices);
 
     private:
     ComPtr<ID3D11Buffer> vertexBuffer;
@@ -40,7 +41,7 @@ namespace Haboob
 	}
 
 	template<typename VertexT>
-	inline HRESULT Mesh<VertexT>::buildBuffers(ID3D11Device* device, const std::vector<VertexT>& vertices, const std::vector<unsigned long>& indices)
+	inline HRESULT Mesh<VertexT>::buildBuffers(ID3D11Device* device, const std::vector<VertexT>& vertices, const std::vector<ULong>& indices)
 	{
 		HRESULT result = S_OK;
 
@@ -69,7 +70,7 @@ namespace Haboob
 			ZeroMemory(&indexBufferSubDesc, sizeof(D3D11_SUBRESOURCE_DATA));
 
 			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			indexBufferDesc.ByteWidth = indices.size() * sizeof(unsigned long);
+			indexBufferDesc.ByteWidth = indices.size() * sizeof(ULong);
 			indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 
 			indexBufferSubDesc.pSysMem = (void*)indices.data();

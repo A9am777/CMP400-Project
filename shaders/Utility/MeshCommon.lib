@@ -1,7 +1,7 @@
 #ifndef MESHCOMMON_H
 #define MESHCOMMON_H
 
-#include "../Utility/Globals.lib"
+#include "Globals.lib"
 
 struct CameraBuffer
 {

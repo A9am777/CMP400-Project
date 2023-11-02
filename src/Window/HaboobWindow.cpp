@@ -30,7 +30,7 @@ namespace Haboob
     testPixelShader = new Shader(Shader::Type::Pixel, L"TestShaders/MeshShaderP");
     testVertexShader->initShader(&device, &shaderManager);
     testPixelShader->initShader(&device, &shaderManager);
-    cubeMesh.build(device.getDevice().Get());
+    testMesh.build(device.getDevice().Get());
 
     // TEST
     {
@@ -158,8 +158,8 @@ namespace Haboob
       }
       context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
 
-      cubeMesh.useBuffers(context);
-      cubeMesh.draw(context);
+      testMesh.useBuffers(context);
+      testMesh.draw(context);
     }
 
     renderTestGUI();
