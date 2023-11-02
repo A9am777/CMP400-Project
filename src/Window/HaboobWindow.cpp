@@ -26,11 +26,19 @@ namespace Haboob
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
 
     // TODO: TEST
-    testVertexShader = new Shader(Shader::Type::Vertex, L"TestShaders/MeshShaderV");
-    testPixelShader = new Shader(Shader::Type::Pixel, L"TestShaders/MeshShaderP");
-    testVertexShader->initShader(&device, &shaderManager);
-    testPixelShader->initShader(&device, &shaderManager);
-    testMesh.build(device.getDevice().Get());
+    {
+      ID3D11Device* dev = device.getDevice().Get();
+
+      renderTarget.create(dev, getWidth(), getHeight());
+
+      testVertexShader = new Shader(Shader::Type::Vertex, L"TestShaders/MeshShaderV");
+      testPixelShader = new Shader(Shader::Type::Pixel, L"TestShaders/MeshShaderP");
+      testVertexShader->initShader(dev, &shaderManager);
+      testPixelShader->initShader(dev, &shaderManager);
+      testMesh.build(dev);
+
+      RenderTarget::copyShader.initShader(dev, &shaderManager);
+    }
 
     // TEST
     {
@@ -71,14 +79,20 @@ namespace Haboob
     // Handle rendering
     {
       imguiFrameBegin();
-      device.clearBackBuffer();
 
       device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
       device.setDepthEnabled(true);
-      device.setBackBufferTarget();
+      renderTarget.clear(device.getContext().Get());
+      renderTarget.setTarget(device.getContext().Get(), device.getDepthBuffer());
       render();
 
+      device.clearBackBuffer();
       device.setBackBufferTarget();
+      device.setRasterState(DisplayDevice::RasterFlags::RASTER_STATE_DEFAULT);
+      device.setDepthEnabled(false);
+      RenderTarget::copyShader.setProjectionMatrix(device.getOrthoMatrix());
+      renderTarget.renderFrom(device.getContext().Get());
+
       imguiFrameEnd();
       device.swapBuffer();
     }
@@ -178,6 +192,8 @@ namespace Haboob
 
   void HaboobWindow::adjustProjection()
   {
+    renderTarget.resize(device.getDevice().Get(), getWidth(), getHeight());
+
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
     float screenAspect = float(getWidth()) / float(getHeight());

@@ -22,7 +22,7 @@ namespace Haboob
     Shader(Type shaderType, const wchar_t* path);
     ~Shader();
 
-    HRESULT initShader(DisplayDevice* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context);
     static void dispatch(ID3D11DeviceContext* context, UInt groupX, UInt groupY, UInt groupZ);
 
@@ -30,7 +30,7 @@ namespace Haboob
     inline bool isCompiled() const { return compiledShader != nullptr; }
 
     protected:
-    HRESULT makeShader(ID3D11DeviceChild** shader, DisplayDevice* device, const ShaderManager* manager);
+    HRESULT makeShader(ID3D11DeviceChild** shader, ID3D11Device* device, const ShaderManager* manager);
     void bindVertex(ID3D11DeviceContext* context);
     void bindPixel(ID3D11DeviceContext* context);
     void bindHull(ID3D11DeviceContext* context);

@@ -18,7 +18,7 @@ namespace Haboob
     }
   }
 
-  HRESULT Shader::initShader(DisplayDevice* device, const ShaderManager* manager)
+  HRESULT Shader::initShader(ID3D11Device* device, const ShaderManager* manager)
   {
     if (compiledShader)
     {
@@ -59,7 +59,7 @@ namespace Haboob
     context->Dispatch(groupX, groupY, groupZ);
   }
 
-  HRESULT Shader::makeShader(ID3D11DeviceChild** shader, DisplayDevice* device, const ShaderManager* manager)
+  HRESULT Shader::makeShader(ID3D11DeviceChild** shader, ID3D11Device* device, const ShaderManager* manager)
   {
     HRESULT result = S_OK;
 
@@ -72,28 +72,28 @@ namespace Haboob
     {
       case Type::Vertex:
       {
-        result = device->getDevice()->CreateVertexShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11VertexShader**>(shader));
+        result = device->CreateVertexShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11VertexShader**>(shader));
         Firebreak(result);
 
         // Link the specified vertex layout
         auto& layout = manager->getVertexLayout();
-        result = device->getDevice()->CreateInputLayout(layout.data(), layout.size(), shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), &inputLayout);
+        result = device->CreateInputLayout(layout.data(), layout.size(), shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), &inputLayout);
       }
       break;
       case Type::Pixel:
-        result = device->getDevice()->CreatePixelShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11PixelShader**>(shader));
+        result = device->CreatePixelShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11PixelShader**>(shader));
       break;
       case Type::Hull:
-        result = device->getDevice()->CreateHullShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11HullShader**>(shader));
+        result = device->CreateHullShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11HullShader**>(shader));
       break;
       case Type::Domain:
-        result = device->getDevice()->CreateDomainShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11DomainShader**>(shader));
+        result = device->CreateDomainShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11DomainShader**>(shader));
       break;
       case Type::Geometry:
-        result = device->getDevice()->CreateGeometryShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11GeometryShader**>(shader));
+        result = device->CreateGeometryShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11GeometryShader**>(shader));
       break;
       case Type::Compute:
-        result = device->getDevice()->CreateComputeShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11ComputeShader**>(shader));
+        result = device->CreateComputeShader(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), NULL, reinterpret_cast<ID3D11ComputeShader**>(shader));
       break;
     }
 

@@ -11,7 +11,7 @@ namespace Haboob
     public:
 		Mesh() = default;
     
-		void draw(ID3D11DeviceContext* context);
+		void draw(ID3D11DeviceContext* context) const;
 		void useBuffers(ID3D11DeviceContext* context, D3D_PRIMITIVE_TOPOLOGY primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		protected:
@@ -24,7 +24,7 @@ namespace Haboob
   };
 
 	template<typename VertexT>
-	inline void Mesh<VertexT>::draw(ID3D11DeviceContext* context)
+	inline void Mesh<VertexT>::draw(ID3D11DeviceContext* context) const
 	{
 		context->DrawIndexed(indexCount, 0, 0);
 	}
@@ -58,7 +58,7 @@ namespace Haboob
 
 			vertexBufferSubDesc.pSysMem = (void*)vertices.data();
 
-			result = device->CreateBuffer(&vertexBufferDesc, &vertexBufferSubDesc, this->vertexBuffer.GetAddressOf());
+			result = device->CreateBuffer(&vertexBufferDesc, &vertexBufferSubDesc, this->vertexBuffer.ReleaseAndGetAddressOf());
 		}
 		Firebreak(result);
 
@@ -75,7 +75,7 @@ namespace Haboob
 
 			indexBufferSubDesc.pSysMem = (void*)indices.data();
 
-			result = device->CreateBuffer(&indexBufferDesc, &indexBufferSubDesc, this->indexBuffer.GetAddressOf());
+			result = device->CreateBuffer(&indexBufferDesc, &indexBufferSubDesc, this->indexBuffer.ReleaseAndGetAddressOf());
 		}
 
 		indexCount = UINT(indices.size());

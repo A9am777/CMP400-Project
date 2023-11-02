@@ -9,6 +9,7 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Geometry/SimpleMeshes.h"
 #include "Rendering/Scene/FreeCam.h"
+#include "Rendering/Textures/RenderTarget.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -65,6 +66,7 @@ namespace Haboob
     XMMATRIX worldMatrix;
     XMMATRIX viewMatrix;
     FreeCam camTest;
+    RenderTarget renderTarget;
     ComPtr<ID3D11Buffer> cameraBuffer;
     private:
     Clock::time_point lastFrame;
