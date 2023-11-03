@@ -9,9 +9,9 @@ namespace Haboob
     public:
     Camera();
 
+    void setProjection(XMMATRIX& matrix);
+    void setView(XMMATRIX& matrix);
     inline void setWorld(const XMMATRIX& matrix) { transformations.worldMatrix = matrix; }
-    inline void setProjection(const XMMATRIX& matrix) { transformations.projectionMatrix = matrix; }
-    inline void setView(const XMMATRIX& matrix) { transformations.viewMatrix = matrix; }
     inline const XMMATRIX& getWorld() const { return transformations.worldMatrix; }
     inline const XMMATRIX& getProjection() const { return transformations.projectionMatrix; }
     inline const XMMATRIX& getView() const { return transformations.viewMatrix; }
@@ -20,6 +20,8 @@ namespace Haboob
     void putPack(void* dest) const;
 
     private:
+    void recomputeInverseViewProjection();
+
     CameraPack transformations;
   };
 }

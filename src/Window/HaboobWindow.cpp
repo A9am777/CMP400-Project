@@ -37,6 +37,7 @@ namespace Haboob
       testVertexShader->initShader(dev, &shaderManager);
       testPixelShader->initShader(dev, &shaderManager);
       testComputeShader->initShader(dev, &shaderManager);
+      raymarchShader.initShader(dev, &shaderManager);
       testMesh.build(dev);
 
       RenderTarget::copyShader.initShader(dev, &shaderManager);
@@ -213,13 +214,14 @@ namespace Haboob
   void HaboobWindow::renderOverlay()
   {
     ID3D11DeviceContext* context = device.getContext().Get();
-    device.setBackBufferTarget();
-    testComputeShader->bindShader(context);
-    ID3D11UnorderedAccessView* accessView = mainRender.getComputeView();
-    context->CSSetUnorderedAccessViews(0, 1, &accessView, 0);
-    testComputeShader->dispatch(context, mainRender.getWidth(), mainRender.getHeight());
-    accessView = nullptr;
-    context->CSSetUnorderedAccessViews(0, 1, &accessView, 0);
+    device.setBackBufferTarget(); // Safety
+
+    raymarchShader.setCameraBuffer(cameraBuffer);
+    raymarchShader.setTarget(&mainRender);
+
+    raymarchShader.bindShader(context);
+    raymarchShader.render(context);
+    raymarchShader.unbindShader(context);
   }
 
   void HaboobWindow::renderMirror()
@@ -298,6 +300,14 @@ namespace Haboob
         ImGui::CheckboxFlags("Solid/Wireframe", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_SOLID);
         ImGui::CheckboxFlags("Cull", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_CULL);
         ImGui::CheckboxFlags("Backface/Frontface", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_BACK);
+      }
+
+      if (ImGui::CollapsingHeader("Raymarch"))
+      {
+        auto& marchInfo = raymarchShader.getMarchInfo();
+        ImGui::DragFloat("Initial step size", &marchInfo.initialZStep);
+        ImGui::DragFloat("Step size", &marchInfo.marchZStep);
+        ImGui::DragInt("Step count", (int*)&marchInfo.iterations);
       }
     }
     ImGui::End();

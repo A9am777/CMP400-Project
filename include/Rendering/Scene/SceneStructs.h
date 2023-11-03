@@ -8,6 +8,8 @@ namespace Haboob
     XMMATRIX worldMatrix;
     XMMATRIX viewMatrix;
     XMMATRIX projectionMatrix;
+    XMMATRIX inverseProjectionMatrix;
+    XMMATRIX inverseViewProjectionMatrix;
   };
 
 }

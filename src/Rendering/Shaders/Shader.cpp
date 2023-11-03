@@ -54,6 +54,31 @@ namespace Haboob
     }
   }
 
+  void Shader::unbindShader(ID3D11DeviceContext* context)
+  {
+    switch (type)
+    {
+      case Type::Vertex:
+        unbindVertex(context);
+        break;
+      case Type::Pixel:
+        unbindPixel(context);
+        break;
+      case Type::Hull:
+        unbindHull(context);
+        break;
+      case Type::Domain:
+        unbindDomain(context);
+        break;
+      case Type::Geometry:
+        unbindGeometry(context);
+        break;
+      case Type::Compute:
+        unbindCompute(context);
+        break;
+    }
+  }
+
   void Shader::dispatch(ID3D11DeviceContext* context, UInt groupX, UInt groupY, UInt groupZ)
   {
     context->Dispatch(groupX, groupY, groupZ);
@@ -106,9 +131,20 @@ namespace Haboob
     context->VSSetShader(reinterpret_cast<ID3D11VertexShader*>(compiledShader), NULL, 0);
   }
 
+  void Shader::unbindVertex(ID3D11DeviceContext* context)
+  {
+    context->IASetInputLayout(nullptr);
+    context->VSSetShader(nullptr, NULL, 0);
+  }
+
   void Shader::bindPixel(ID3D11DeviceContext* context)
   {
     context->PSSetShader(reinterpret_cast<ID3D11PixelShader*>(compiledShader), NULL, 0);
+  }
+
+  void Shader::unbindPixel(ID3D11DeviceContext* context)
+  {
+    context->PSSetShader(nullptr, NULL, 0);
   }
 
   void Shader::bindHull(ID3D11DeviceContext* context)
@@ -116,9 +152,19 @@ namespace Haboob
     context->HSSetShader(reinterpret_cast<ID3D11HullShader*>(compiledShader), NULL, 0);
   }
 
+  void Shader::unbindHull(ID3D11DeviceContext* context)
+  {
+    context->HSSetShader(nullptr, NULL, 0);
+  }
+
   void Shader::bindDomain(ID3D11DeviceContext* context)
   {
     context->DSSetShader(reinterpret_cast<ID3D11DomainShader*>(compiledShader), NULL, 0);
+  }
+
+  void Shader::unbindDomain(ID3D11DeviceContext* context)
+  {
+    context->DSSetShader(nullptr, NULL, 0);
   }
 
   void Shader::bindGeometry(ID3D11DeviceContext* context)
@@ -126,8 +172,17 @@ namespace Haboob
     context->GSSetShader(reinterpret_cast<ID3D11GeometryShader*>(compiledShader), NULL, 0);
   }
 
+  void Shader::unbindGeometry(ID3D11DeviceContext* context)
+  {
+    context->GSSetShader(nullptr, NULL, 0);
+  }
+
   void Shader::bindCompute(ID3D11DeviceContext* context)
   {
     context->CSSetShader(reinterpret_cast<ID3D11ComputeShader*>(compiledShader), NULL, 0);
+  }
+  void Shader::unbindCompute(ID3D11DeviceContext* context)
+  {
+    context->CSSetShader(nullptr, NULL, 0);
   }
 }

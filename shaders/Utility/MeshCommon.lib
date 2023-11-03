@@ -8,6 +8,8 @@ struct CameraBuffer
   matrix worldMatrix;
   matrix viewMatrix;
   matrix projectionMatrix;
+  matrix inverseProjectionMatrix;
+  matrix inverseViewProjectionMatrix;
 };
 
 struct VertexInputType

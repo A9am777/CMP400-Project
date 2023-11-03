@@ -10,6 +10,7 @@
 #include "Rendering/Geometry/SimpleMeshes.h"
 #include "Rendering/Scene/FreeCam.h"
 #include "Rendering/Textures/RenderTarget.h"
+#include "Rendering/Shaders/RaymarchVolumeShader.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -64,6 +65,7 @@ namespace Haboob
     Shader* testVertexShader;
     Shader* testPixelShader;
     Shader* testComputeShader;
+    RaymarchVolumeShader raymarchShader;
     ShaderManager shaderManager;
 
     // TEST
