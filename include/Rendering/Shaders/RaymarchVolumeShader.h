@@ -18,9 +18,10 @@ namespace Haboob
  {
    float attenuationFactor = 1.f; // Scales optical depth
    XMFLOAT3 colourHGScatter = {1.f, 1.f, 1.f}; // Per component light scattering for the HG phase function
+   float densityCoefficient = 1.f; // Scaling factor of density
    UINT flagApplyBeer = ~0; // Controls whether to apply Beer-Lambert attenuation
    UINT flagApplyHG = ~0; // Controls whether to apply the HG phase function
-   XMUINT2 padding;
+   UINT padding;
  };
 
  struct ComprehensiveBufferInfo

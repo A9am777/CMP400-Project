@@ -13,6 +13,6 @@ namespace Haboob
     XMFLOAT3 specular;
     float padding3;
 
-    XMFLOAT4 direction = {0.f, 0.f, 1.f, 1.f};
+    XMFLOAT4 direction = {0.f, -1.f, -1.f, 1.f};
   };
 }

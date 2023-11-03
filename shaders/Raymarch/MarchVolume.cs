@@ -62,23 +62,47 @@ bool inSphere(in Ray ray, in Sphere sphere)
 float sphereDensitySample(in Ray ray, in Sphere sphere)
 {
   float3 displacement = ray.pos.xyz - sphere.pos.xyz;
-  return max(sphere.sqrRadius - dot(displacement, displacement), 1.) / sphere.sqrRadius; // dot(x, x) = |x|^2
+  return max(sphere.sqrRadius - dot(displacement, displacement), 0.) / sphere.sqrRadius; // dot(x, x) = |x|^2
 }
 
 float beerLambertAttenuation(float opticalDepth)
 {
-  return exp(-opticalDepth);
+  return opticalInfo.flagApplyBeer ? exp(-opticalDepth) : 1.;
 }
 
 // Henyey-Greenstein scattering function
-float hgScatter(in float3 viewDir, in float3 lightDir, float gCoeff)
+float hgScatter(float angularDistance, float gCoeff)
 {
-  float phase = dot(viewDir, lightDir); // cos angle
   static float intCoeff = 1. / (4. * PI);
   float numerator = 1. - gCoeff * gCoeff;
-  float denominator = 1. + gCoeff * gCoeff - 2. * gCoeff * phase;
+  float denominator = 1. + gCoeff * gCoeff - 2. * gCoeff * angularDistance;
   
-  return numerator * intCoeff / pow(denominator, 1.5);
+  return opticalInfo.flagApplyHG ? numerator * intCoeff / pow(denominator, 1.5) : 1.;
+}
+
+float hgScatter(in float3 viewDir, in float3 lightDir, float gCoeff)
+{
+  float angular = dot(viewDir, -lightDir); // cos angle
+  return hgScatter(angular, gCoeff);
+}
+
+float3 applyScatter(in float3 colour, float angularDistance)
+{
+  return colour * float3(
+    hgScatter(angularDistance, opticalInfo.colourHGScatter.r),
+    hgScatter(angularDistance, opticalInfo.colourHGScatter.g),
+    hgScatter(angularDistance, opticalInfo.colourHGScatter.b));
+}
+
+float3 applyScatter(in float3 colour, in float3 viewDir, in float3 lightDir)
+{
+  float angular = dot(viewDir, -lightDir); // cos angle
+  return applyScatter(colour, angular);
+}
+
+float4 alphaBlend(float4 foreground, float4 background)
+{
+  return foreground * foreground.a + (1. - foreground.a) * background;
 }
 
 [numthreads(1, 1, 1)]
@@ -114,30 +138,24 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   sphere.pos = float4(0., 0., 1., 1.);
   sphere.sqrRadius = 1.;
   
-  //
-  float3 incomingIntensity = light.diffuse;
-  if (opticalInfo.flagApplyHG)
-  {
-    // Directional lighting will have a constant phase along the ray
-    incomingIntensity = incomingIntensity * float3(
-    hgScatter(ray.dir.xyz, light.direction.xyz, opticalInfo.colourHGScatter.r),
-    hgScatter(ray.dir.xyz, light.direction.xyz, opticalInfo.colourHGScatter.g),
-    hgScatter(ray.dir.xyz, light.direction.xyz, opticalInfo.colourHGScatter.b));
-  }
+  // Directional lighting will have a constant phase along the ray
+  float3 incomingIntensity = applyScatter(light.diffuse, ray.dir.xyz, light.direction.xyz);
   
-  float opticalDepthAccum = 0.;
+  float absorption = 0.;
   float intensity = 0.;
   [loop] // Yeah need to consider this
   for (uint i = 0; i < dispatchInfo.iterations; ++i)
   {
-    opticalDepthAccum += sphereDensitySample(ray, sphere);
+    float density = opticalInfo.densityCoefficient * sphereDensitySample(ray, sphere);
+    absorption += density * (1. - absorption);
     if (inSphere(ray, sphere))
     {
-      intensity += opticalInfo.flagApplyBeer ? beerLambertAttenuation(opticalDepthAccum * opticalInfo.attenuationFactor) : 1. / opticalDepthAccum;
+      intensity += density * beerLambertAttenuation(absorption * opticalInfo.attenuationFactor) * (1. - absorption);
     }
     
     march(ray, dispatchInfo.marchZStep);
   }
   
-  screenOut[threadID.xy] = screenOut[threadID.xy] + float4(intensity * incomingIntensity, 0.);
+  screenOut[threadID.xy] *= beerLambertAttenuation(absorption * opticalInfo.attenuationFactor);
+  screenOut[threadID.xy] += float4(intensity * incomingIntensity, 0.);
 }

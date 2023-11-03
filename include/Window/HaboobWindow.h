@@ -50,6 +50,8 @@ namespace Haboob
 
     LRESULT customRoutine(UINT message, WPARAM wParam, LPARAM lParam) override;
 
+    void redoCameraBuffer(ID3D11DeviceContext* context); // Strictly testing
+
     void renderBegin();
     void renderOverlay(); // Raymarch environment
     void renderMirror(); // Copies from mainRender to the back buffer
@@ -62,7 +64,9 @@ namespace Haboob
 
     void renderTestGUI();
 
-    SimpleSphereMesh testMesh;
+    SimplePlaneMesh planeMesh;
+    SimpleSphereMesh sphereMesh;
+    SimpleCubeMesh cubeMesh;
     Shader* testVertexShader;
     Shader* testPixelShader;
     Shader* testComputeShader;
@@ -82,7 +86,7 @@ namespace Haboob
     Clock::time_point lastFrame;
 
     // ImGui
-    float cubePos[3] = {.0f, .0f, 2.5f};
+    float spherePos[3] = {.0f, .0f, 2.5f};
     float lightDir[3] = { .0f, .0f, 1.f };
     UInt mainRasterMode;
     ImGuiContext* imgui;

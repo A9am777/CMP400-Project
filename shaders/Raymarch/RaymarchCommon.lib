@@ -18,9 +18,10 @@ struct BasicOptics
 {
   float attenuationFactor; // Scales optical depth
   float3 colourHGScatter; // Per component light scattering for the HG phase function
+  float densityCoefficient;
   uint flagApplyBeer; // Controls whether to apply Beer-Lambert attenuation
   uint flagApplyHG; // Controls whether to apply the HG phase function
-  uint2 padding;
+  uint padding;
 };
   
 #endif
