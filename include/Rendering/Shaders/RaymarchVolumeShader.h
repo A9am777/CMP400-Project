@@ -14,6 +14,21 @@ namespace Haboob
     XMFLOAT3 padding;
   };
 
+ struct BasicOptics
+ {
+   float attenuationFactor = 1.f; // Scales optical depth
+   XMFLOAT3 colourHGScatter = {1.f, 1.f, 1.f}; // Per component light scattering for the HG phase function
+   UINT flagApplyBeer = ~0; // Controls whether to apply Beer-Lambert attenuation
+   UINT flagApplyHG = ~0; // Controls whether to apply the HG phase function
+   XMUINT2 padding;
+ };
+
+ struct ComprehensiveBufferInfo
+ {
+   MarchVolumeDispatchInfo marchVolumeInfo;
+   BasicOptics opticalInfo;
+ };
+
   class RaymarchVolumeShader
   {
     public:
@@ -31,11 +46,13 @@ namespace Haboob
     inline void setLightBuffer(ComPtr<ID3D11Buffer> buffer) { lightBuffer = buffer; }
 
     inline MarchVolumeDispatchInfo& getMarchInfo() { return marchInfo; }
+    inline BasicOptics& getOpticsInfo() { return opticsInfo; }
 
     private:
     Shader* computeShader;
     RenderTarget* renderTarget;
     MarchVolumeDispatchInfo marchInfo;
+    BasicOptics opticsInfo;
     ComPtr<ID3D11Buffer> marchBuffer;
     ComPtr<ID3D11Buffer> cameraBuffer;
     ComPtr<ID3D11Buffer> lightBuffer;

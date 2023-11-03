@@ -45,15 +45,20 @@ namespace Haboob
 
     // TEST
     {
-      D3D11_BUFFER_DESC cameraBufferDesc;
+      // Camera buffer
+      D3D11_BUFFER_DESC bufferDesc;
       HRESULT result = S_OK; // unused
-      cameraBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-      cameraBufferDesc.ByteWidth = sizeof(CameraPack);
-      cameraBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-      cameraBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-      cameraBufferDesc.MiscFlags = 0;
-      cameraBufferDesc.StructureByteStride = 0;
-      result = device.getDevice()->CreateBuffer(&cameraBufferDesc, NULL, cameraBuffer.GetAddressOf());
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+      bufferDesc.ByteWidth = sizeof(CameraPack);
+      bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+      bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      bufferDesc.MiscFlags = 0;
+      bufferDesc.StructureByteStride = 0;
+      result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, cameraBuffer.ReleaseAndGetAddressOf());
+
+      // Light buffer
+      bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
+      result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, lightBuffer.ReleaseAndGetAddressOf());
     }
 
     lastFrame = Clock::now();
@@ -166,6 +171,13 @@ namespace Haboob
         camTest.putPack(mapped.pData);
         context->Unmap(cameraBuffer.Get(), 0);
       }
+      // Light data
+      {
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        HRESULT result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        std::memcpy(mapped.pData, &dirLightPack, sizeof(DirectionalLightPack));
+        context->Unmap(lightBuffer.Get(), 0);
+      }
       context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
 
       testMesh.useBuffers(context);
@@ -217,6 +229,7 @@ namespace Haboob
     device.setBackBufferTarget(); // Safety
 
     raymarchShader.setCameraBuffer(cameraBuffer);
+    raymarchShader.setLightBuffer(lightBuffer);
     raymarchShader.setTarget(&mainRender);
 
     raymarchShader.bindShader(context);
@@ -308,6 +321,15 @@ namespace Haboob
         ImGui::DragFloat("Initial step size", &marchInfo.initialZStep);
         ImGui::DragFloat("Step size", &marchInfo.marchZStep);
         ImGui::DragInt("Step count", (int*)&marchInfo.iterations);
+      }
+
+      if (ImGui::CollapsingHeader("Optics"))
+      {
+        auto& opticsInfo = raymarchShader.getOpticsInfo();
+        ImGui::DragFloat("Beer attenuation factor", &opticsInfo.attenuationFactor);
+        ImGui::DragFloat3("Henyey-Greenstein phase coefficients", &opticsInfo.colourHGScatter.x, .01f, .0f, 1.f);
+        ImGui::CheckboxFlags("Apply beer", &opticsInfo.flagApplyBeer, ~0);
+        ImGui::CheckboxFlags("Apply HG", &opticsInfo.flagApplyHG, ~0);
       }
     }
     ImGui::End();

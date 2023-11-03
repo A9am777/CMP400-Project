@@ -13,5 +13,14 @@ struct MarchVolumeDispatchInfo
   
   float3 padding;
 };
+
+struct BasicOptics
+{
+  float attenuationFactor; // Scales optical depth
+  float3 colourHGScatter; // Per component light scattering for the HG phase function
+  uint flagApplyBeer; // Controls whether to apply Beer-Lambert attenuation
+  uint flagApplyHG; // Controls whether to apply the HG phase function
+  uint2 padding;
+};
   
 #endif

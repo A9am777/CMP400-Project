@@ -1,0 +1,19 @@
+#ifndef LIGHTSTRUCTS_H
+#define LIGHTSTRUCTS_H
+
+// To optimise
+struct DirectionalLight
+{
+  float3 diffuse;
+  float padding1;
+    
+  float3 ambient;
+  float padding2;
+    
+  float3 specular;
+  float padding3;
+    
+  float4 direction;
+};
+
+#endif

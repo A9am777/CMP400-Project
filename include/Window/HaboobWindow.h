@@ -9,6 +9,7 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Geometry/SimpleMeshes.h"
 #include "Rendering/Scene/FreeCam.h"
+#include "Rendering/Lighting/LightStructs.h"
 #include "Rendering/Textures/RenderTarget.h"
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
 
@@ -74,12 +75,15 @@ namespace Haboob
     XMMATRIX viewMatrix;
     FreeCam camTest;
     RenderTarget mainRender;
+    DirectionalLightPack dirLightPack;
     ComPtr<ID3D11Buffer> cameraBuffer;
+    ComPtr<ID3D11Buffer> lightBuffer;
     private:
     Clock::time_point lastFrame;
 
     // ImGui
     float cubePos[3] = {.0f, .0f, 2.5f};
+    float lightDir[3] = { .0f, .0f, 1.f };
     UInt mainRasterMode;
     ImGuiContext* imgui;
   };
