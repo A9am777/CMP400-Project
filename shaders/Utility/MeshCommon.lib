@@ -1,11 +1,15 @@
 #ifndef MESHCOMMON_H
 #define MESHCOMMON_H
 
+#include "Globals.lib"
+
 struct CameraBuffer
 {
   matrix worldMatrix;
   matrix viewMatrix;
   matrix projectionMatrix;
+  matrix inverseProjectionMatrix;
+  matrix inverseViewProjectionMatrix;
 };
 
 struct VertexInputType

@@ -9,17 +9,19 @@ namespace Haboob
     public:
     Camera();
 
-    inline void setWorld(const XMMATRIX& matrix) { transformations.worldMatrix = XMMatrixTranspose(matrix); }
-    inline void setProjection(const XMMATRIX& matrix) { transformations.projectionMatrix = XMMatrixTranspose(matrix); }
-    inline void setView(const XMMATRIX& matrix) { transformations.viewMatrix = XMMatrixTranspose(matrix); }
-    inline const XMMATRIX& getWorld() const { return XMMatrixTranspose(transformations.worldMatrix); }
-    inline const XMMATRIX& getProjection() const { return XMMatrixTranspose(transformations.projectionMatrix); }
-    inline const XMMATRIX& getView() const { return XMMatrixTranspose(transformations.viewMatrix); }
+    void setProjection(XMMATRIX& matrix);
+    void setView(XMMATRIX& matrix);
+    inline void setWorld(const XMMATRIX& matrix) { transformations.worldMatrix = matrix; }
+    inline const XMMATRIX& getWorld() const { return transformations.worldMatrix; }
+    inline const XMMATRIX& getProjection() const { return transformations.projectionMatrix; }
+    inline const XMMATRIX& getView() const { return transformations.viewMatrix; }
 
     // Directly copies the optimised matrices to the address
     void putPack(void* dest) const;
 
     private:
+    void recomputeInverseViewProjection();
+
     CameraPack transformations;
   };
 }

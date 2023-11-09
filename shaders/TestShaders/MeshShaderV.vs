@@ -1,4 +1,4 @@
-#include "MeshCommon.lib"
+#include "../Utility/MeshCommon.lib"
 
 cbuffer CameraSlot : register(b0)
 {

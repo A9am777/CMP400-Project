@@ -9,6 +9,9 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Geometry/SimpleMeshes.h"
 #include "Rendering/Scene/FreeCam.h"
+#include "Rendering/Lighting/LightStructs.h"
+#include "Rendering/Textures/RenderTarget.h"
+#include "Rendering/Shaders/RaymarchVolumeShader.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -47,6 +50,12 @@ namespace Haboob
 
     LRESULT customRoutine(UINT message, WPARAM wParam, LPARAM lParam) override;
 
+    void redoCameraBuffer(ID3D11DeviceContext* context); // Strictly testing
+
+    void renderBegin();
+    void renderOverlay(); // Raymarch environment
+    void renderMirror(); // Copies from mainRender to the back buffer
+
     void imguiStart();
     void imguiEnd();
     void imguiFrameBegin();
@@ -55,9 +64,13 @@ namespace Haboob
 
     void renderTestGUI();
 
+    SimplePlaneMesh planeMesh;
+    SimpleSphereMesh sphereMesh;
     SimpleCubeMesh cubeMesh;
     Shader* testVertexShader;
     Shader* testPixelShader;
+    Shader* testComputeShader;
+    RaymarchVolumeShader raymarchShader;
     ShaderManager shaderManager;
 
     // TEST
@@ -65,12 +78,16 @@ namespace Haboob
     XMMATRIX worldMatrix;
     XMMATRIX viewMatrix;
     FreeCam camTest;
+    RenderTarget mainRender;
+    DirectionalLightPack dirLightPack;
     ComPtr<ID3D11Buffer> cameraBuffer;
+    ComPtr<ID3D11Buffer> lightBuffer;
     private:
     Clock::time_point lastFrame;
 
     // ImGui
-    float cubePos[3] = {.0f, .0f, 2.5f};
+    float spherePos[3] = {.0f, .0f, 2.5f};
+    float lightDir[3] = { .0f, .0f, 1.f };
     UInt mainRasterMode;
     ImGuiContext* imgui;
   };

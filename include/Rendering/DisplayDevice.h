@@ -39,7 +39,6 @@ namespace Haboob
     void setRasterState(RasterFlags newState = RASTER_STATE_DEFAULT, bool force = false);
     inline RasterFlags getRasterState() const { return rasterState; }
 
-
     // Swaps the back buffer to screen
     HRESULT swapBuffer(UINT flags = NULL);
 
@@ -47,6 +46,11 @@ namespace Haboob
     inline ComPtr<ID3D11Device> getDevice() { return device; }
     inline ComPtr<ID3D11DeviceContext> getContext() { return deviceContext; }
     inline D3D_FEATURE_LEVEL getLevel() const { return featureLevel; }
+
+    // Buffers
+    inline ID3D11DepthStencilView* getDepthBuffer() { return depthBufferView.Get(); }
+
+    inline const XMMATRIX& getOrthoMatrix() const { return orthoMatrix; }
 
     private:
     static std::vector<D3D_FEATURE_LEVEL> defaultFeatureLevels;
@@ -62,7 +66,10 @@ namespace Haboob
     ComPtr<IDXGISwapChain> swapChain;
     ComPtr<ID3D11Texture2D> backBufferTexture;
     ComPtr<ID3D11RenderTargetView> backBufferTarget;
+
     D3D11_VIEWPORT backBufferViewport;
+    XMMATRIX orthoMatrix;
+    
     ComPtr<ID3D11Texture2D> depthBufferTexture;
     ComPtr<ID3D11DepthStencilView> depthBufferView;
 

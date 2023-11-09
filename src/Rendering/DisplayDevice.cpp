@@ -98,7 +98,7 @@ namespace Haboob
     HRESULT result = S_OK;
 
     // Fetch the back buffer from the swap chain
-    result = swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)backBufferTexture.GetAddressOf());
+    result = swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)backBufferTexture.ReleaseAndGetAddressOf());
     Firebreak(result);
 
     // Set viewport
@@ -114,8 +114,11 @@ namespace Haboob
       backBufferViewport.MaxDepth = 1.f;
     }
 
+    // Make orthographic matrix
+    orthoMatrix = XMMatrixOrthographicLH(float(backBufferViewport.Width), float(backBufferViewport.Height), backBufferViewport.MinDepth, backBufferViewport.MaxDepth);
+
     // Create back buffer target
-    result = device->CreateRenderTargetView(backBufferTexture.Get(), nullptr, backBufferTarget.GetAddressOf());
+    result = device->CreateRenderTargetView(backBufferTexture.Get(), nullptr, backBufferTarget.ReleaseAndGetAddressOf());
     Firebreak(result);
 
     result = makeDepthBuffer();
@@ -211,7 +214,7 @@ namespace Haboob
       depthBufferDesc.CPUAccessFlags = 0;
       depthBufferDesc.MiscFlags = 0;
 
-      result = device->CreateTexture2D(&depthBufferDesc, NULL, depthBufferTexture.GetAddressOf());
+      result = device->CreateTexture2D(&depthBufferDesc, NULL, depthBufferTexture.ReleaseAndGetAddressOf());
     }
     Firebreak(result);
 
@@ -224,7 +227,7 @@ namespace Haboob
       depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
       depthViewDesc.Texture2D.MipSlice = 0;
 
-      result = device->CreateDepthStencilView(depthBufferTexture.Get(), &depthViewDesc, depthBufferView.GetAddressOf());
+      result = device->CreateDepthStencilView(depthBufferTexture.Get(), &depthViewDesc, depthBufferView.ReleaseAndGetAddressOf());
     }
 
     return result;
@@ -255,12 +258,12 @@ namespace Haboob
       depthStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 
       // Enabled state
-      result = device->CreateDepthStencilState(&depthStateDesc, &depthEnabledState);
+      result = device->CreateDepthStencilState(&depthStateDesc, depthEnabledState.ReleaseAndGetAddressOf());
       Firebreak(result);
 
       // Disabled state
       depthStateDesc.DepthEnable = false;
-      result = device->CreateDepthStencilState(&depthStateDesc, &depthDisabledState);
+      result = device->CreateDepthStencilState(&depthStateDesc, depthDisabledState.ReleaseAndGetAddressOf());
       Firebreak(result);
     }
 
@@ -289,7 +292,7 @@ namespace Haboob
         rasterDesc.CullMode = backFace ? D3D11_CULL_BACK : D3D11_CULL_FRONT;
         rasterDesc.CullMode = cull ? rasterDesc.CullMode : D3D11_CULL_NONE;
 
-        result = device->CreateRasterizerState(&rasterDesc, rasterStates[bitState].GetAddressOf());
+        result = device->CreateRasterizerState(&rasterDesc, rasterStates[bitState].ReleaseAndGetAddressOf());
         Firebreak(result);
       }
     }

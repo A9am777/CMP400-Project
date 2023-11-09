@@ -12,6 +12,6 @@ template<typename T> T BitClear(const T state, const T mask) { return static_cas
 // Unsigned types
 typedef unsigned char Byte;
 typedef unsigned int UInt;
-
+typedef unsigned long ULong;
 
 #endif

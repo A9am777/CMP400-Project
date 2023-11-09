@@ -25,24 +25,45 @@ namespace Haboob
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
 
+
+    camTest.getPosition().y = 1.5f;
     // TODO: TEST
-    testVertexShader = new Shader(Shader::Type::Vertex, L"TestShaders/MeshShaderV");
-    testPixelShader = new Shader(Shader::Type::Pixel, L"TestShaders/MeshShaderP");
-    testVertexShader->initShader(&device, &shaderManager);
-    testPixelShader->initShader(&device, &shaderManager);
-    cubeMesh.build(device.getDevice().Get());
+    {
+      ID3D11Device* dev = device.getDevice().Get();
+
+      mainRender.create(dev, getWidth(), getHeight());
+
+      testVertexShader = new Shader(Shader::Type::Vertex, L"TestShaders/MeshShaderV");
+      testPixelShader = new Shader(Shader::Type::Pixel, L"TestShaders/MeshShaderP");
+      testComputeShader = new Shader(Shader::Type::Compute, L"TestShaders/TestComputeScreenDraw");
+      testVertexShader->initShader(dev, &shaderManager);
+      testPixelShader->initShader(dev, &shaderManager);
+      testComputeShader->initShader(dev, &shaderManager);
+      raymarchShader.initShader(dev, &shaderManager);
+      
+      sphereMesh.build(dev);
+      cubeMesh.build(dev);
+      planeMesh.build(dev);
+
+      RenderTarget::copyShader.initShader(dev, &shaderManager);
+    }
 
     // TEST
     {
-      D3D11_BUFFER_DESC cameraBufferDesc;
+      // Camera buffer
+      D3D11_BUFFER_DESC bufferDesc;
       HRESULT result = S_OK; // unused
-      cameraBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-      cameraBufferDesc.ByteWidth = sizeof(CameraPack);
-      cameraBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-      cameraBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-      cameraBufferDesc.MiscFlags = 0;
-      cameraBufferDesc.StructureByteStride = 0;
-      result = device.getDevice()->CreateBuffer(&cameraBufferDesc, NULL, cameraBuffer.GetAddressOf());
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+      bufferDesc.ByteWidth = sizeof(CameraPack);
+      bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+      bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      bufferDesc.MiscFlags = 0;
+      bufferDesc.StructureByteStride = 0;
+      result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, cameraBuffer.ReleaseAndGetAddressOf());
+
+      // Light buffer
+      bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
+      result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, lightBuffer.ReleaseAndGetAddressOf());
     }
 
     lastFrame = Clock::now();
@@ -71,14 +92,14 @@ namespace Haboob
     // Handle rendering
     {
       imguiFrameBegin();
-      device.clearBackBuffer();
 
-      device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
-      device.setDepthEnabled(true);
-      device.setBackBufferTarget();
+      renderBegin();
       render();
+      renderOverlay();
+      renderMirror();
 
-      device.setBackBufferTarget();
+      renderTestGUI();
+
       imguiFrameEnd();
       device.swapBuffer();
     }
@@ -139,7 +160,6 @@ namespace Haboob
 
   void HaboobWindow::render()
   {
-
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // TEST
@@ -147,22 +167,34 @@ namespace Haboob
       testVertexShader->bindShader(context);
       testPixelShader->bindShader(context);
 
-      camTest.setWorld(XMMatrixIdentity() * XMMatrixTranslation(cubePos[0], cubePos[1], cubePos[2]));
-
-      // Camera data
+      // Light data
       {
         D3D11_MAPPED_SUBRESOURCE mapped;
-        HRESULT result = context->Map(cameraBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-        camTest.putPack(mapped.pData);
-        context->Unmap(cameraBuffer.Get(), 0);
+        HRESULT result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        std::memcpy(mapped.pData, &dirLightPack, sizeof(DirectionalLightPack));
+        context->Unmap(lightBuffer.Get(), 0);
       }
       context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
+      context->PSSetConstantBuffers(0, 1, lightBuffer.GetAddressOf());
+
+      camTest.setWorld(XMMatrixIdentity() * XMMatrixTranslation(spherePos[0], spherePos[1], spherePos[2]));
+      redoCameraBuffer(context);
+
+      sphereMesh.useBuffers(context);
+      sphereMesh.draw(context);
+
+      camTest.setWorld(XMMatrixScaling(5.f, 5.f, 1.f) * XMMatrixLookToLH(XMVectorZero(), XMVectorSet(.0f, 1.f, .0f, 1.f), XMVectorSet(.0f, .0f, -1.f, 1.f)) * XMMatrixTranslation(.0f, -1.f, .0f));
+      redoCameraBuffer(context);
+
+      planeMesh.useBuffers(context);
+      planeMesh.draw(context);
+
+      camTest.setWorld(XMMatrixTranslation(-2.f, 1.5f, .0f));
+      redoCameraBuffer(context);
 
       cubeMesh.useBuffers(context);
       cubeMesh.draw(context);
     }
-
-    renderTestGUI();
   }
 
   void HaboobWindow::createD3D()
@@ -178,6 +210,8 @@ namespace Haboob
 
   void HaboobWindow::adjustProjection()
   {
+    mainRender.resize(device.getDevice().Get(), getWidth(), getHeight());
+
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
     float screenAspect = float(getWidth()) / float(getHeight());
@@ -190,6 +224,50 @@ namespace Haboob
   LRESULT HaboobWindow::customRoutine(UINT message, WPARAM wParam, LPARAM lParam)
   {
     return ImGui_ImplWin32_WndProcHandler(wHandle, message, wParam, lParam);
+  }
+
+  void HaboobWindow::redoCameraBuffer(ID3D11DeviceContext* context)
+  {
+    // Camera data
+    {
+      D3D11_MAPPED_SUBRESOURCE mapped;
+      HRESULT result = context->Map(cameraBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+      camTest.putPack(mapped.pData);
+      context->Unmap(cameraBuffer.Get(), 0);
+    }
+  }
+
+  void HaboobWindow::renderBegin()
+  {
+    // Render to the main target using vanilla settings
+    device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
+    device.setDepthEnabled(true);
+    mainRender.clear(device.getContext().Get());
+    mainRender.setTarget(device.getContext().Get(), device.getDepthBuffer());
+  }
+
+  void HaboobWindow::renderOverlay()
+  {
+    ID3D11DeviceContext* context = device.getContext().Get();
+    device.setBackBufferTarget(); // Safety
+
+    raymarchShader.setCameraBuffer(cameraBuffer);
+    raymarchShader.setLightBuffer(lightBuffer);
+    raymarchShader.setTarget(&mainRender);
+
+    raymarchShader.bindShader(context);
+    raymarchShader.render(context);
+    raymarchShader.unbindShader(context);
+  }
+
+  void HaboobWindow::renderMirror()
+  {
+    device.clearBackBuffer();
+    device.setBackBufferTarget();
+    device.setRasterState(DisplayDevice::RasterFlags::RASTER_STATE_DEFAULT);
+    device.setDepthEnabled(false);
+    RenderTarget::copyShader.setProjectionMatrix(device.getOrthoMatrix());
+    mainRender.renderFrom(device.getContext().Get());
   }
 
   void HaboobWindow::imguiStart()
@@ -245,7 +323,7 @@ namespace Haboob
     if (ImGui::Begin("DEBUGWINDOW", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
       ImGui::Text("Hello World");
-      ImGui::DragFloat3("Cube Pos", cubePos, 1.f, -10.f, 10.f);
+      ImGui::DragFloat3("Sphere Pos", spherePos, 1.f, -10.f, 10.f);
 
       if (ImGui::CollapsingHeader("Camera"))
       {
@@ -258,6 +336,37 @@ namespace Haboob
         ImGui::CheckboxFlags("Solid/Wireframe", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_SOLID);
         ImGui::CheckboxFlags("Cull", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_CULL);
         ImGui::CheckboxFlags("Backface/Frontface", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_BACK);
+      }
+
+      if (ImGui::CollapsingHeader("Light"))
+      {
+        ImGui::DragFloat3("Light direction", &dirLightPack.direction.x);
+        if (ImGui::Button("Normalise light"))
+        {
+          XMVECTOR vec = XMLoadFloat4(&dirLightPack.direction);
+          vec = XMVector3Normalize(vec);
+          XMStoreFloat4(&dirLightPack.direction, vec);
+        }
+        ImGui::DragFloat3("Light colour", &dirLightPack.diffuse.x);
+      }
+
+      if (ImGui::CollapsingHeader("Raymarch"))
+      {
+        auto& marchInfo = raymarchShader.getMarchInfo();
+        ImGui::DragFloat("Initial step size", &marchInfo.initialZStep);
+        ImGui::DragFloat("Step size", &marchInfo.marchZStep);
+        ImGui::DragInt("Step count", (int*)&marchInfo.iterations, .1f, 0, 100);
+
+      }
+
+      if (ImGui::CollapsingHeader("Optics"))
+      {
+        auto& opticsInfo = raymarchShader.getOpticsInfo();
+        ImGui::DragFloat("Beer attenuation factor", &opticsInfo.attenuationFactor);
+        ImGui::DragFloat3("Henyey-Greenstein phase coefficients", &opticsInfo.colourHGScatter.x, .01f, .0f, 1.f);
+        ImGui::DragFloat("Density Coefficient", &opticsInfo.densityCoefficient);
+        ImGui::CheckboxFlags("Apply beer", &opticsInfo.flagApplyBeer, ~0);
+        ImGui::CheckboxFlags("Apply HG", &opticsInfo.flagApplyHG, ~0);
       }
     }
     ImGui::End();
