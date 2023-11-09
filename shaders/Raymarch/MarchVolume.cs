@@ -19,6 +19,14 @@ cbuffer LightSlot : register(b2)
   DirectionalLight light;
 }
 
+struct MarchParams
+{
+  float initialStep;
+  float marchZStep;
+  uint iterations;
+  bool mask;
+};
+
 struct Ray
 {
   float4 pos;
@@ -51,6 +59,32 @@ void fromHomogeneous(inout float4 vec)
 void march(inout Ray ray, float stepSize)
 {
   ray.pos = ray.pos + ray.dir * stepSize;
+}
+
+float3 solveQuadratic(float a, float b, float c)
+{
+  float determinant = b * b - 4 * a * c;
+  float rtDeterminant = sqrt(determinant);
+  return float3(determinant, float2(-b - rtDeterminant, -b + rtDeterminant) / (2 * a));
+}
+
+// Compute the optimal march params for this sphere
+void determineSphereParams(inout MarchParams params, in Ray ray, in Sphere sphere)
+{
+  // Compute intersection(s)
+  float3 result;
+  {
+    float3 translation = ray.pos.xyz - sphere.pos.xyz;
+    float a = dot(ray.dir.xyz, ray.dir.xyz);
+    float b = 2. * dot(translation, ray.dir.xyz);
+    float c = dot(translation, translation) - sphere.sqrRadius;
+  
+    result = solveQuadratic(a, b, c);
+  }
+  
+  params.mask = result.x < .0;
+  params.initialStep = max(result.y, .0); // Do NOT step if currently inside volume
+  params.marchZStep = (result.z - params.initialStep) / float(params.iterations);
 }
 
 bool inSphere(in Ray ray, in Sphere sphere)
@@ -130,13 +164,23 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   ray.colour = float4(1., 1., 1., 0.);
   
-  // Jump forward
-  march(ray, dispatchInfo.initialZStep);
-  
   // Test sphere
   Sphere sphere;
   sphere.pos = float4(0., 0., 1., 1.);
   sphere.sqrRadius = 1.;
+  
+  // Compute optimal march params
+  MarchParams params;
+  params.iterations = dispatchInfo.iterations;
+  determineSphereParams(params, ray, sphere);
+  
+  if(params.mask)
+  {
+    return;
+  }
+  
+  // Jump forward
+  march(ray, params.initialStep);
   
   // Directional lighting will have a constant phase along the ray
   float3 incomingIntensity = applyScatter(light.diffuse, ray.dir.xyz, light.direction.xyz);
@@ -144,7 +188,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   float absorption = 0.;
   float intensity = 0.;
   [loop] // Yeah need to consider this
-  for (uint i = 0; i < dispatchInfo.iterations; ++i)
+  for (uint i = 0; i < params.iterations; ++i)
   {
     float density = opticalInfo.densityCoefficient * sphereDensitySample(ray, sphere);
     absorption += density * (1. - absorption);
@@ -153,7 +197,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
       intensity += density * beerLambertAttenuation(absorption * opticalInfo.attenuationFactor) * (1. - absorption);
     }
     
-    march(ray, dispatchInfo.marchZStep);
+    march(ray, params.marchZStep);
   }
   
   screenOut[threadID.xy] *= beerLambertAttenuation(absorption * opticalInfo.attenuationFactor);
