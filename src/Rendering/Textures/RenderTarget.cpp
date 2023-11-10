@@ -15,7 +15,9 @@ namespace Haboob
     0 
   };
 
-  float RenderTarget::defaultRed[4] = { 1.0f, 0.1f, 0.1f, 1.0f };
+  float RenderTarget::defaultBlack[4] = { .0f, .0f, .0f, .0f };
+  float RenderTarget::defaultWhite[4] = { 1.f, 1.f, 1.f, 1.f };
+  float RenderTarget::defaultRed[4] = { 1.f, .1f, .1f, 1.f };
 
   RenderCopyShader RenderTarget::copyShader;
 
