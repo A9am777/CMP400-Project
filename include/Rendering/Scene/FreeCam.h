@@ -12,8 +12,10 @@ namespace Haboob
 
     void update(float dt, WSTR::VKeys* keys, WSTR::MousePointer* mouse);
 
-    XMFLOAT3& getPosition() { return position; }
-    XMFLOAT3& getAngles() { return eulerAngles; }
+    inline XMFLOAT3& getPosition() { return position; }
+    inline XMFLOAT3& getAngles() { return eulerAngles; }
+    inline float& getMoveRate() { return moveRate; }
+    inline float& getMouseSensitivity() { return mouseSensitivity; }
 
     private:
     float mouseSensitivity;

@@ -172,6 +172,11 @@ namespace Haboob
         D3D11_MAPPED_SUBRESOURCE mapped;
         HRESULT result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
         std::memcpy(mapped.pData, &dirLightPack, sizeof(DirectionalLightPack));
+
+        XMVECTOR vec = XMLoadFloat4(&dirLightPack.direction);
+        vec = XMVector3Normalize(vec);
+        XMStoreFloat4(&reinterpret_cast<DirectionalLightPack*>(mapped.pData)->direction, vec);
+
         context->Unmap(lightBuffer.Get(), 0);
       }
       context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
@@ -329,6 +334,8 @@ namespace Haboob
       {
         ImGui::DragFloat3("Camera Pos", &camTest.getPosition().x, 1.f, -10.f, 10.f);
         ImGui::DragFloat2("Camera Rot", &camTest.getAngles().x, XM_PI * .01f, -XM_PI, XM_PI);
+        ImGui::DragFloat("Camera Speed", &camTest.getMoveRate());
+        ImGui::DragFloat("Camera Look Speed", &camTest.getMouseSensitivity());
       }
 
       if (ImGui::CollapsingHeader("Raster State"))
@@ -341,12 +348,6 @@ namespace Haboob
       if (ImGui::CollapsingHeader("Light"))
       {
         ImGui::DragFloat3("Light direction", &dirLightPack.direction.x);
-        if (ImGui::Button("Normalise light"))
-        {
-          XMVECTOR vec = XMLoadFloat4(&dirLightPack.direction);
-          vec = XMVector3Normalize(vec);
-          XMStoreFloat4(&dirLightPack.direction, vec);
-        }
         ImGui::DragFloat3("Light colour", &dirLightPack.diffuse.x);
       }
 

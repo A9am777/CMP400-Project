@@ -1,0 +1,10 @@
+#ifndef GBUFFER_H
+#define GBUFFER_H
+
+struct GBufferOut
+{
+  float4 diffuse : SV_Target0; // colour(r, g, b), unused
+  float4 normal : SV_Target1; // normal(nx, ny, nz), depth
+};
+
+#endif
