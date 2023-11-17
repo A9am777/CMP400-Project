@@ -12,6 +12,7 @@
 #include "Rendering/Lighting/LightStructs.h"
 #include "Rendering/Textures/RenderTarget.h"
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
+#include "Rendering/Textures/GBuffer.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -64,6 +65,7 @@ namespace Haboob
 
     void renderTestGUI();
 
+    GBuffer gbuffer;
     SimplePlaneMesh planeMesh;
     SimpleSphereMesh sphereMesh;
     SimpleCubeMesh cubeMesh;
@@ -86,6 +88,7 @@ namespace Haboob
     Clock::time_point lastFrame;
 
     // ImGui
+    float fps;
     float spherePos[3] = {.0f, .0f, 2.5f};
     float lightDir[3] = { .0f, .0f, 1.f };
     UInt mainRasterMode;

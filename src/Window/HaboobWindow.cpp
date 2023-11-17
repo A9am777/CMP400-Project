@@ -9,7 +9,9 @@ namespace Haboob
 {
   HaboobWindow::HaboobWindow() : imgui{ nullptr }
   {
-
+    camTest.getMoveRate() = 6.f;
+    gbuffer.getGamma() = .2f;
+    gbuffer.getExposure() = 4.f;
   }
   HaboobWindow::~HaboobWindow()
   {
@@ -32,9 +34,10 @@ namespace Haboob
       ID3D11Device* dev = device.getDevice().Get();
 
       mainRender.create(dev, getWidth(), getHeight());
+      gbuffer.create(dev, getWidth(), getHeight());
 
-      testVertexShader = new Shader(Shader::Type::Vertex, L"TestShaders/MeshShaderV");
-      testPixelShader = new Shader(Shader::Type::Pixel, L"TestShaders/MeshShaderP");
+      testVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV");
+      testPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP");
       testComputeShader = new Shader(Shader::Type::Compute, L"TestShaders/TestComputeScreenDraw");
       testVertexShader->initShader(dev, &shaderManager);
       testPixelShader->initShader(dev, &shaderManager);
@@ -46,6 +49,8 @@ namespace Haboob
       planeMesh.build(dev);
 
       RenderTarget::copyShader.initShader(dev, &shaderManager);
+      GBuffer::toneMapShader.initShader(dev, &shaderManager);
+      GBuffer::lightShader.initShader(dev, &shaderManager);
     }
 
     // TEST
@@ -95,6 +100,7 @@ namespace Haboob
 
       renderBegin();
       render();
+      device.setBackBufferTarget(); // Safety
       renderOverlay();
       renderMirror();
 
@@ -155,7 +161,7 @@ namespace Haboob
 
   void HaboobWindow::update(float dt)
   {
-    
+    fps = 1.f / dt;
   }
 
   void HaboobWindow::render()
@@ -167,13 +173,6 @@ namespace Haboob
       testVertexShader->bindShader(context);
       testPixelShader->bindShader(context);
 
-      // Light data
-      {
-        D3D11_MAPPED_SUBRESOURCE mapped;
-        HRESULT result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-        std::memcpy(mapped.pData, &dirLightPack, sizeof(DirectionalLightPack));
-        context->Unmap(lightBuffer.Get(), 0);
-      }
       context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
       context->PSSetConstantBuffers(0, 1, lightBuffer.GetAddressOf());
 
@@ -212,6 +211,8 @@ namespace Haboob
   {
     mainRender.resize(device.getDevice().Get(), getWidth(), getHeight());
 
+    gbuffer.resize(device.getDevice().Get(), getWidth(), getHeight());
+
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
     float screenAspect = float(getWidth()) / float(getHeight());
@@ -242,18 +243,31 @@ namespace Haboob
     // Render to the main target using vanilla settings
     device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
     device.setDepthEnabled(true);
-    mainRender.clear(device.getContext().Get());
-    mainRender.setTarget(device.getContext().Get(), device.getDepthBuffer());
+    gbuffer.clear(device.getContext().Get());
+    gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
   }
 
   void HaboobWindow::renderOverlay()
   {
     ID3D11DeviceContext* context = device.getContext().Get();
-    device.setBackBufferTarget(); // Safety
+
+    // Light data
+    {
+      D3D11_MAPPED_SUBRESOURCE mapped;
+      HRESULT result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+      std::memcpy(mapped.pData, &dirLightPack, sizeof(DirectionalLightPack));
+
+      XMVECTOR vec = XMLoadFloat4(&dirLightPack.direction);
+      vec = XMVector3Normalize(vec);
+      XMStoreFloat4(&reinterpret_cast<DirectionalLightPack*>(mapped.pData)->direction, vec);
+
+      context->Unmap(lightBuffer.Get(), 0);
+    }
+    gbuffer.lightPass(context, lightBuffer.Get());
 
     raymarchShader.setCameraBuffer(cameraBuffer);
     raymarchShader.setLightBuffer(lightBuffer);
-    raymarchShader.setTarget(&mainRender);
+    raymarchShader.setTarget(&gbuffer.getLitColourTarget());
 
     raymarchShader.bindShader(context);
     raymarchShader.render(context);
@@ -267,7 +281,10 @@ namespace Haboob
     device.setRasterState(DisplayDevice::RasterFlags::RASTER_STATE_DEFAULT);
     device.setDepthEnabled(false);
     RenderTarget::copyShader.setProjectionMatrix(device.getOrthoMatrix());
-    mainRender.renderFrom(device.getContext().Get());
+
+    auto context = device.getContext().Get();
+    gbuffer.finalLitPass(context);
+    gbuffer.renderFromLit(context);
   }
 
   void HaboobWindow::imguiStart()
@@ -322,6 +339,7 @@ namespace Haboob
   {
     if (ImGui::Begin("DEBUGWINDOW", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
+      ImGui::Text("fps: %f", fps);
       ImGui::Text("Hello World");
       ImGui::DragFloat3("Sphere Pos", spherePos, 1.f, -10.f, 10.f);
 
@@ -329,6 +347,8 @@ namespace Haboob
       {
         ImGui::DragFloat3("Camera Pos", &camTest.getPosition().x, 1.f, -10.f, 10.f);
         ImGui::DragFloat2("Camera Rot", &camTest.getAngles().x, XM_PI * .01f, -XM_PI, XM_PI);
+        ImGui::DragFloat("Camera Speed", &camTest.getMoveRate());
+        ImGui::DragFloat("Camera Look Speed", &camTest.getMouseSensitivity());
       }
 
       if (ImGui::CollapsingHeader("Raster State"))
@@ -341,13 +361,9 @@ namespace Haboob
       if (ImGui::CollapsingHeader("Light"))
       {
         ImGui::DragFloat3("Light direction", &dirLightPack.direction.x);
-        if (ImGui::Button("Normalise light"))
-        {
-          XMVECTOR vec = XMLoadFloat4(&dirLightPack.direction);
-          vec = XMVector3Normalize(vec);
-          XMStoreFloat4(&dirLightPack.direction, vec);
-        }
         ImGui::DragFloat3("Light colour", &dirLightPack.diffuse.x);
+        ImGui::DragFloat("Gamma", &gbuffer.getGamma());
+        ImGui::DragFloat("Exposure", &gbuffer.getExposure());
       }
 
       if (ImGui::CollapsingHeader("Raymarch"))

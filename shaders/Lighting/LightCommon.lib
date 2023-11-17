@@ -1,0 +1,10 @@
+#ifndef LIGHTCOMMON_H
+#define LIGHTCOMMON_H
+
+// Remaps light to be more appealing
+float halfLambert(float intensity)
+{
+  return pow(intensity * .5 + .5, 2.);
+}
+
+#endif
