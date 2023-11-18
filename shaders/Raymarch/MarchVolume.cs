@@ -143,8 +143,8 @@ float4 alphaBlend(float4 foreground, float4 background)
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
   // Actually a matrix is probably better here, maybe even rasterisation pass?
-  float2 normScreen = float2(normToSigned(float(threadID.x) * dispatchInfo.outputHorizontalStep),
-                              -normToSigned(float(threadID.y) * dispatchInfo.outputVerticalStep));
+  float2 normScreen = float2(normToSigned((float(threadID.x) + .5f) * dispatchInfo.outputHorizontalStep),
+                              -normToSigned((float(threadID.y) + .5f) * dispatchInfo.outputVerticalStep));
   
   // Form a ray from the screen
   Ray ray;

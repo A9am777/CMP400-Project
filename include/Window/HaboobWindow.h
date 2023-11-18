@@ -76,6 +76,7 @@ namespace Haboob
     ShaderManager shaderManager;
 
     // TEST
+    VolumeGenerationShader haboobVolume;
     XMMATRIX projectionMatrix;
     XMMATRIX worldMatrix;
     XMMATRIX viewMatrix;
@@ -90,7 +91,6 @@ namespace Haboob
     // ImGui
     float fps;
     float spherePos[3] = {.0f, .0f, 2.5f};
-    float lightDir[3] = { .0f, .0f, 1.f };
     UInt mainRasterMode;
     ImGuiContext* imgui;
   };

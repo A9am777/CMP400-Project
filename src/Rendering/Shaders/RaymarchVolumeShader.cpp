@@ -75,4 +75,134 @@ namespace Haboob
   {
     computeShader->dispatch(context, renderTarget->getWidth(), renderTarget->getHeight());
   }
+
+  VolumeGenerationShader::VolumeGenerationShader()
+  {
+    generateVolumeShader = new Shader(Shader::Type::Compute, L"TestShaders/TestFormHaboob");
+  }
+
+  VolumeGenerationShader::~VolumeGenerationShader()
+  {
+    delete generateVolumeShader; generateVolumeShader = nullptr;
+  }
+  HRESULT VolumeGenerationShader::initShader(ID3D11Device* device, const ShaderManager* manager)
+  {
+    HRESULT result = S_OK;
+
+    result = generateVolumeShader->initShader(device, manager);
+    Firebreak(result);
+
+    // Create the volume info buffer
+    {
+      D3D11_BUFFER_DESC volumeBufferDesc;
+      volumeBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+      volumeBufferDesc.ByteWidth = sizeof(VolumeInfo);
+      volumeBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+      volumeBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      volumeBufferDesc.MiscFlags = 0;
+      volumeBufferDesc.StructureByteStride = 0;
+      result = device->CreateBuffer(&volumeBufferDesc, NULL, volumeInfoBuffer.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
+    return result;
+  }
+
+  HRESULT VolumeGenerationShader::rebuild(ID3D11Device* device)
+  {
+    HRESULT result = S_OK;
+
+    // Create the texture
+    D3D11_TEXTURE3D_DESC volumeTextureDesc;
+    {
+      ZeroMemory(&volumeTextureDesc, sizeof(D3D11_TEXTURE3D_DESC));
+
+      volumeTextureDesc.Width = volumeInfo.size.x;
+      volumeTextureDesc.Height = volumeInfo.size.y;
+      volumeTextureDesc.Depth = volumeInfo.size.z;
+      volumeTextureDesc.MipLevels = 1;
+      volumeTextureDesc.Format = DXGI_FORMAT_R32_FLOAT;
+      volumeTextureDesc.Usage = D3D11_USAGE_DEFAULT;
+      volumeTextureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+
+      result = device->CreateTexture3D(&volumeTextureDesc, nullptr, texture.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
+    // Create the target
+    {
+      D3D11_RENDER_TARGET_VIEW_DESC renderTargetDesc;
+      ZeroMemory(&renderTargetDesc, sizeof(D3D11_RENDER_TARGET_VIEW_DESC));
+
+      renderTargetDesc.Format = volumeTextureDesc.Format;
+      renderTargetDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE3D;
+      renderTargetDesc.Texture3D.FirstWSlice = 0;
+      renderTargetDesc.Texture3D.MipSlice = 0;
+      renderTargetDesc.Texture3D.WSize = volumeTextureDesc.Depth;
+
+      result = device->CreateRenderTargetView(texture.Get(), &renderTargetDesc, textureTarget.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
+    // Create the shader view
+    {
+      D3D11_SHADER_RESOURCE_VIEW_DESC shaderViewDesc;
+      ZeroMemory(&shaderViewDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+
+      shaderViewDesc.Format = volumeTextureDesc.Format;
+      shaderViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
+      shaderViewDesc.Texture3D.MipLevels = 1;
+
+      result = device->CreateShaderResourceView(texture.Get(), &shaderViewDesc, textureShaderView.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
+    // Create the compute unordered access view
+    {
+      D3D11_UNORDERED_ACCESS_VIEW_DESC computeAccessDesc;
+      ZeroMemory(&computeAccessDesc, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
+      computeAccessDesc.Format = DXGI_FORMAT_R32_FLOAT;
+      computeAccessDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE3D;
+      computeAccessDesc.Texture3D.FirstWSlice = 0;
+      computeAccessDesc.Texture3D.MipSlice = 0;
+      computeAccessDesc.Texture3D.WSize = volumeTextureDesc.Depth;
+
+      result = device->CreateUnorderedAccessView(texture.Get(), &computeAccessDesc, computeAccessView.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
+    return result;
+  }
+
+  void VolumeGenerationShader::render(ID3D11DeviceContext* context)
+  {
+    generateVolumeShader->bindShader(context);
+    bindShader(context);
+    Shader::dispatch(context, volumeInfo.size.x, volumeInfo.size.y, volumeInfo.size.z);
+    unbindShader(context);
+    generateVolumeShader->unbindShader(context);
+  }
+
+  void VolumeGenerationShader::bindShader(ID3D11DeviceContext* context)
+  {
+    // Update volume buffer
+    {
+      D3D11_MAPPED_SUBRESOURCE mapped;
+      HRESULT result = context->Map(volumeInfoBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+      std::memcpy(mapped.pData, &volumeInfo, sizeof(VolumeInfo));
+      context->Unmap(volumeInfoBuffer.Get(), 0);
+    }
+
+    context->CSSetConstantBuffers(0, 1, volumeInfoBuffer.GetAddressOf());
+    context->CSSetUnorderedAccessViews(0, 1, computeAccessView.GetAddressOf(), 0);
+  }
+
+  void VolumeGenerationShader::unbindShader(ID3D11DeviceContext* context)
+  {
+    void* nullpo = nullptr;
+
+    context->CSSetConstantBuffers(0, 1, (ID3D11Buffer**)&nullpo);
+    context->CSSetUnorderedAccessViews(0, 1, (ID3D11UnorderedAccessView**)&nullpo, 0);
+  }
+
 }
