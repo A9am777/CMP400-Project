@@ -71,7 +71,7 @@ namespace Haboob
     ~RaymarchVolumeShader();
 
     HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
-    void bindShader(ID3D11DeviceContext* context);
+    void bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource);
     void unbindShader(ID3D11DeviceContext* context);
 
     void render(ID3D11DeviceContext* context) const;
@@ -88,6 +88,7 @@ namespace Haboob
     RenderTarget* renderTarget;
     MarchVolumeDispatchInfo marchInfo;
     BasicOptics opticsInfo;
+    ComPtr<ID3D11SamplerState> marchSamplerState;
     ComPtr<ID3D11Buffer> marchBuffer;
     ComPtr<ID3D11Buffer> cameraBuffer;
     ComPtr<ID3D11Buffer> lightBuffer;

@@ -279,7 +279,7 @@ namespace Haboob
     raymarchShader.setLightBuffer(lightBuffer);
     raymarchShader.setTarget(&gbuffer.getLitColourTarget());
 
-    raymarchShader.bindShader(context);
+    raymarchShader.bindShader(context, haboobVolume.getShaderView());
     raymarchShader.render(context);
     raymarchShader.unbindShader(context);
   }

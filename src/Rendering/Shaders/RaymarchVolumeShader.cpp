@@ -33,10 +33,30 @@ namespace Haboob
       Firebreak(result);
     }
 
+    // Create the density volume sampler
+    {
+      D3D11_SAMPLER_DESC volumeSamplerDesc;
+      ZeroMemory(&volumeSamplerDesc, sizeof(D3D11_SAMPLER_DESC));
+
+      // Important for automatically rejecting samples outside of bounds
+      volumeSamplerDesc.AddressU = volumeSamplerDesc.AddressV = volumeSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+      volumeSamplerDesc.BorderColor[0] = volumeSamplerDesc.BorderColor[1] = volumeSamplerDesc.BorderColor[2] = volumeSamplerDesc.BorderColor[3] = 0.f;
+
+      volumeSamplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+      volumeSamplerDesc.MipLODBias = 0.0f;
+      volumeSamplerDesc.MaxAnisotropy = 1;
+      volumeSamplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+      volumeSamplerDesc.MinLOD = 0;
+      volumeSamplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+      
+      result = device->CreateSamplerState(&volumeSamplerDesc, marchSamplerState.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
     return result;
   }
 
-  void RaymarchVolumeShader::bindShader(ID3D11DeviceContext* context)
+  void RaymarchVolumeShader::bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource)
   {
     computeShader->bindShader(context);
     ID3D11UnorderedAccessView* accessView = renderTarget->getComputeView();
@@ -58,6 +78,9 @@ namespace Haboob
 
     context->CSSetConstantBuffers(1, 1, marchBuffer.GetAddressOf());
     context->CSSetConstantBuffers(2, 1, lightBuffer.GetAddressOf());
+
+    context->CSSetSamplers(0, 1, marchSamplerState.GetAddressOf());
+    context->CSSetShaderResources(0, 1, &densityTexResource);
   }
 
   void RaymarchVolumeShader::unbindShader(ID3D11DeviceContext* context)
@@ -69,6 +92,8 @@ namespace Haboob
     context->CSSetConstantBuffers(0, 1, (ID3D11Buffer**)&nullpo);
     context->CSSetConstantBuffers(1, 1, (ID3D11Buffer**)&nullpo);
     context->CSSetConstantBuffers(2, 1, (ID3D11Buffer**)&nullpo);
+    context->CSSetSamplers(0, 1, (ID3D11SamplerState**)&nullpo);
+    context->CSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
   }
 
   void RaymarchVolumeShader::render(ID3D11DeviceContext* context) const

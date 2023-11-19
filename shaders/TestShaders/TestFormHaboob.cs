@@ -16,9 +16,10 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
 {
   float3 normalisedLocation = float3(threadID.xyz) / float3(info.size);
   normalisedLocation = normalisedLocation - float3(.5, .5, .5);
-  normalisedLocation = normalisedLocation * 2.;
   
-  float sphereDensity = saturate(1.f - dot(normalisedLocation, normalisedLocation));
+  float sqrRadius = .5 * .5;
+  
+  float sphereDensity = saturate(sqrRadius - dot(normalisedLocation, normalisedLocation)) / sqrRadius;
   
   textureOut[threadID.xyz] = sphereDensity;
 }
