@@ -218,7 +218,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Test sampling cube
   Cube cube;
-  cube.size = float3(1., 1., 1.);
+  cube.size = float3(3., 3., 3.);
   cube.pos = float4(sphere.pos.xyz - cube.size * float3(.5,.5,.5), 1.); // Shift from centre origin to AABB
   
   sphere.sqrRadius = dot(cube.size * float3(.5, .5, .5), cube.size * float3(.5, .5, .5)); // Encapsulate cube
@@ -239,21 +239,29 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Directional lighting will have a constant phase along the ray
   float3 incomingIntensity = applyScatter(light.diffuse, ray.dir.xyz, light.direction.xyz);
   
+  Integrator absorptionInte;
+  absorptionInte.firstTerm = absorptionInte.odds = absorptionInte.evens = absorptionInte.lastTerm = .0;
+  Integrator intensityInte;
+  intensityInte.firstTerm = intensityInte.odds = intensityInte.evens = intensityInte.lastTerm = .0;
+
   float absorption = 0.;
   float intensity = 0.;
   [loop] // Yeah need to consider this
   for (uint i = 0; i < params.iterations; ++i)
   {
-    float density = opticalInfo.densityCoefficient * cubeDensitySample(ray, cube);
-    absorption += density * (1. - absorption);
+    float densitySample = opticalInfo.densityCoefficient * cubeDensitySample(ray, cube);
+    absorption += densitySample;
+    append(absorptionInte, densitySample, i + 1);
     //if (inSphere(ray, sphere))
     //{
-      intensity += density * beerLambertAttenuation(absorption * opticalInfo.attenuationFactor) * (1. - absorption);
+    float intensitySample = densitySample * beerLambertAttenuation(integrate(absorptionInte, i + 1) * opticalInfo.attenuationFactor);
+    intensity += intensitySample;
+    append(intensityInte, intensitySample, i + 1);
     //}
     
     march(ray, params.marchZStep);
   }
   
-  screenOut[threadID.xy] *= beerLambertAttenuation(absorption * opticalInfo.attenuationFactor);
-  screenOut[threadID.xy] += float4(intensity * incomingIntensity, 0.);
+  screenOut[threadID.xy] *= beerLambertAttenuation(integrate(absorptionInte, params.iterations) * opticalInfo.attenuationFactor);
+  screenOut[threadID.xy] += float4(integrate(intensityInte, params.iterations) * incomingIntensity, 0.);
 }

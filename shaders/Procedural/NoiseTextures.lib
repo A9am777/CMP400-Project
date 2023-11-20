@@ -1,0 +1,267 @@
+#ifndef NOISETEXTURES_H
+
+//Noise
+#include "Voronoi.lib"
+#include "fBM.lib"
+
+//Classic srcAlpha oneMinusSrcAlpha blend
+float4 blendColours(float4 destDiffuse, float4 srcDiffuse)
+{
+    //Premultiply alphas
+    srcDiffuse.xyz *= srcDiffuse.a;
+    destDiffuse *= 1.0f - srcDiffuse.a;
+    
+    //Add together
+    destDiffuse += srcDiffuse;
+    
+    destDiffuse.a = saturate(destDiffuse.a);
+    
+    return destDiffuse;
+}
+
+//Represents a combined diffuse colour, normal map tangents and specular colour at a point
+class Texel
+{
+    float2 worldPosition;
+    
+    float4 diffuse;
+    float4 specular;
+    
+    float tangentX; //The combined differential of y with respect to x
+    float tangentZ; //The combined differential of y with respect to z
+    
+    //Creates a new texel for a position with default values
+    void blank(float2 pos)
+    {
+        worldPosition = pos;
+        
+        diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
+        specular = float4(1.0f, 1.0f, 1.0f, 0.0f);
+
+        tangentX = 0;
+        tangentZ = 0;
+    }
+    
+    void addDiffuse(float4 newDiffuse)
+    {
+        diffuse = blendColours(diffuse, newDiffuse);
+    }
+    
+    void addSpecular(float4 newSpec)
+    {
+        specular = blendColours(specular, newSpec);
+    }
+    
+    float3 getNormal()
+    {
+        //Get vectors of tangents
+        float3 tang1 = normalize(float3(1, tangentX, 0));
+        float3 tang2 = normalize(float3(0, tangentZ, 1));
+        
+        //Return the normal which is the cross of the tangents
+        return cross(tang2, tang1);
+    }
+    
+    float3 getNormalmap()
+    {
+        //Get normal vector
+        float3 normal = getNormal();
+        
+        //Convert to normal map axes and return
+        return float3(-normal.x, normal.z, normal.y);
+    }
+};
+
+//Returns a random colour in a range 
+float4 randomColour(inout TEA rng, float4 mins, float4 maxs)
+{
+    float4 params; //The linear parameters
+    for (uint i = 0; i < 4; i++)
+    {
+        rng.stir();
+        params[i] = rng.getFloat();
+    }
+    
+    return lerp(mins, maxs, params);
+}
+
+//Returns a random value in a range 
+float randomRanged(inout TEA rng, float min, float max)
+{
+    float param; //The linear parameter
+    rng.stir();
+    param = rng.getFloat();
+    
+    return lerp(min, max, param);
+}
+
+//Uses voronoi to scatter hemispheres of different colours and radii
+void applyPointNoise(inout Texel tex, inout WorldSpace space, TEA baseRNG, float2 voronoiOffset, float2 voronoiScale, float4 minDiffuse, float4 maxDiffuse, float minRadius, float maxRadius)
+{
+    TEA ptRng = baseRNG;
+    TEA ptValuesRng = branchRNG(ptRng);
+    
+    //Get the nearest voronoi point
+    Voronoi::Vertex vorPt = Voronoi::simpleVoronoi(space, baseRNG, tex.worldPosition, voronoiOffset, voronoiScale);
+    
+    //Make the point the context for the values RNG
+    {
+        WorldPoint worldPt = space.getPoint(vorPt.pos);
+        ptValuesRng.associate(worldPt.packed);
+    }
+    
+    //Get the values of this hemisphere
+    float sphereRadius = randomRanged(ptValuesRng, minRadius, maxRadius);
+    float4 sphereDiffuse = randomColour(ptValuesRng, minDiffuse, maxDiffuse);
+    
+    //Only the square radius is required
+    sphereRadius *= sphereRadius;
+    
+    //Return early if the position is outside the sphere
+    [flatten] //Run BOTH versions and then select the values depending on the condition. Very costly but required with this shader model
+    if (dot(tex.worldPosition - vorPt.pos, tex.worldPosition - vorPt.pos) >= sphereRadius) { return; }
+    
+    //Now calculate the tangents
+    //Calculate the vertical sphere displacement
+    float yOff = sphereRadius + 2 * dot(vorPt.pos, tex.worldPosition) - dot(tex.worldPosition, tex.worldPosition) - dot(vorPt.pos, vorPt.pos);
+    //Must be a positive displacement
+    [flatten] //Run BOTH versions and then select the values depending on the condition. Very costly but required with this shader model
+    if (yOff <= 0) { return; }
+    yOff = sqrt(yOff);
+    
+    //Use this to get the differentials of y along the axes
+    float tanX = (tex.worldPosition.x - vorPt.pos.x) / yOff;
+    float tanZ = (tex.worldPosition.y - vorPt.pos.y) / yOff;
+    
+    //Apply values
+    tex.addDiffuse(sphereDiffuse);
+    
+    //Apply tangents (unlike other functions, transparency has no effect since translucent pebbles and such exist)
+    tex.tangentX += tanX;
+    tex.tangentZ += tanZ;
+}
+
+//Uses voronoi edges to create a cracked surface 
+void applyCracks(inout Texel tex, inout WorldSpace space, inout TEA baseRNG, float2 voronoiOffset, float2 voronoiScale, float4 flatDiffuse, float4 crackDiffuse, float radiusCracks, float crackDepth)
+{
+    Voronoi::Vertex neighbours[VORONOI_MAX_NEIGHBOURS];
+    Voronoi::getVoronoiNeighbours(neighbours, space, baseRNG, tex.worldPosition, voronoiOffset, voronoiScale, VORONOI_BASIC_RADIUS);
+    
+    //Get the nearest point which is also the polygon this position is contained in
+    uint nearest = Voronoi::getVoronoiAffinity(neighbours, VORONOI_BASIC_NEIGHBOURS);
+    Voronoi::Vertex nearestVert = neighbours[nearest];
+    
+    //Now construct the bitangent polygon lines (cracks), determine which ones this position is close enough to be inside and then interpolate tangents and 'depth'
+    uint cracksInside = 0;
+    float depth = 0;
+    float combinedDepth = 0;
+    float2 tangents = float2(0, 0);
+    for (uint i = 0; i < VORONOI_BASIC_NEIGHBOURS; i++)
+    {
+        //Ignore the nearest since it shouldn't be compared to itself!
+        if (i == nearest) { continue; }
+
+        //The edge is the bitangent of the two points!
+        Line edgeLine;
+        edgeLine.makeBiTangent(nearestVert.pos, neighbours[i].pos);
+        
+        //Draw a line towards the edge to determine where they meet
+        Line hereToEdge;
+        hereToEdge.dir = nearestVert.pos - neighbours[i].pos;
+        hereToEdge.pt = tex.worldPosition;
+        
+        //Get the point of intersection
+        float2 hit;
+        if (!hereToEdge.intersection(hit, edgeLine)) { continue; }
+        
+        //The tangential distance from the edge
+        float distance = length(hit - tex.worldPosition);
+        
+        //Convert the distance into the [0, 1] parametric representation of the displacement
+        float t = 1.0f - distance / radiusCracks;
+        if (t < 0) { continue; } //Skip if outside the radius
+
+        //Convert the tangent line into the parametric displacement
+        float2 normed = normalize(hereToEdge.dir);
+        
+        //Get the differentials of t with respect to each axis
+        float diffX = -normed.x;
+        float diffZ = -normed.y;
+        
+        //Calculate the 'height' according to a falloff curve
+        float height = 3.0f * pow(t, 2.0f) - 2.0f * pow(t, 3.0f);
+        
+        //Using precalculated differentials, find the variance of height
+        float tanX = 6.0f * diffX * (t - t * t);
+        float tanZ = 6.0f * diffZ * (t - t * t);
+        
+        //Add the results
+        tangents.x += tanX * height; //Weight each tangent by depth
+        tangents.y += tanZ * height;
+        combinedDepth += height; //Weighted average at the end will determine tangent
+        
+        depth = max(depth, height); //For actual depth, pick only the deepest
+        cracksInside++;
+    }
+    
+    //If inside cracks, average the tangents
+    if(cracksInside)
+    {
+        tangents /= combinedDepth;
+    }
+    
+    //The diffuse is the interpolation of the two colours depending on depth
+    float4 diffuse = flatDiffuse + (crackDiffuse - flatDiffuse) * depth;
+    tex.addDiffuse(diffuse);
+    
+    //Scale down by alpha - if it isn't visible, there shouldn't even be depth
+    crackDepth *= diffuse.a;
+    
+    tex.tangentX += tangents.x * crackDepth * diffuse.a;
+    tex.tangentZ += tangents.y * crackDepth * diffuse.a;
+}
+
+//Basic perlin noise texture
+void applyPerlinNoise(inout Texel tex, inout WorldSpace space, TEA baseRNG, float2 absoluteOffset, float2 absoluteScale, float4 minDiffuse, float4 maxDiffuse, float depth)
+{
+    float2 position = tex.worldPosition;
+    Perlin::Section perlinSection = Perlin::getSection(space, baseRNG, position, absoluteOffset, absoluteScale);
+    float perlinVal = Perlin::perlinNoise(perlinSection, position);
+    float2 calcTangents = Perlin::perlinNoiseDerivatives(perlinSection, position);
+    
+    //Convert from [-1, 1] to [0, 1]
+    perlinVal = (perlinVal + 1.0f) * 0.5f;
+    calcTangents *= 0.5f;
+    
+    //Interpolate the colour
+    float4 diffuse = minDiffuse + (maxDiffuse - minDiffuse) * perlinVal;
+    tex.addDiffuse(diffuse);
+    
+    //Add the tangents (scaled for visibility)
+    tex.tangentX += calcTangents.x * depth * diffuse.a;
+    tex.tangentZ += calcTangents.y * depth * diffuse.a;
+}
+
+//Basic fBM texture
+void applyfBMNoise(inout Texel tex, inout WorldSpace space, inout TEA baseRNG, inout fBM fbm, float2 absoluteOffset, float2 absoluteScale, float4 minDiffuse, float4 maxDiffuse, float depth)
+{
+    float2 position = tex.worldPosition;
+    float2 calcTangents;
+    float fBMVal = fbm.fBMNoise(space, baseRNG, calcTangents, position, absoluteOffset, absoluteScale);
+    
+    float fBMMax = fbm.maxValue();
+    //Convert from [-max, max] to [-1, 1] to [0, 2] to [0, 1]
+    fBMVal = (fBMVal / fBMMax + 1.0f) * 0.5f;
+    calcTangents *= 0.5f; //No point rescaling the tangents
+    
+    //Interpolate the colour
+    float4 diffuse = minDiffuse + (maxDiffuse - minDiffuse) * fBMVal;
+    tex.addDiffuse(diffuse);
+    
+    //Add the tangents (scaled for visibility)
+    tex.tangentX += calcTangents.x * depth * diffuse.a;
+    tex.tangentZ += calcTangents.y * depth * diffuse.a;
+}
+
+#define NOISETEXTURES_H
+#endif

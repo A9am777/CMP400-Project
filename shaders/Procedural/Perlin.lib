@@ -1,0 +1,397 @@
+#ifndef PERLIN_H
+
+#include "TEA.lib"
+#include "World.lib"
+
+namespace Perlin
+{
+    //A quad representing a section of the perlin noise grid
+    struct Section
+    {
+        //Vertices
+        float2 BL;
+        float2 BR;
+        float2 TL;
+        float2 TR;
+
+        //Associated gradients of the vertices
+        float2 BLgrad;
+        float2 BRgrad;
+        float2 TLgrad;
+        float2 TRgrad;
+    };
+  
+  //A cube representing a section of the perlin noise grid
+  struct Section3D
+  {
+    // Vertices
+    // Back quad
+    float3 BBL;
+    float3 BBR;
+    float3 BTL;
+    float3 BTR;
+    // Front quad
+    float3 FBL;
+    float3 FBR;
+    float3 FTL;
+    float3 FTR;
+    //Associated gradients of the vertices
+    float3 BBLgrad;
+    float3 BBRgrad;
+    float3 BTLgrad;
+    float3 BTRgrad;
+    float3 FBLgrad;
+    float3 FBRgrad;
+    float3 FTLgrad;
+    float3 FTRgrad;
+  };
+    
+    //Perlin fade function (smoother step)
+    float fade(float t)
+    {
+        return 6.0f * pow(t, 5.0f) - 15.0f * pow(t, 4.0f) + 10.0f * pow(t, 3.0f);
+    }
+    
+    //Perlin fade function derivative (smoother step)
+    float fadeDerivative(float t)
+    {
+        return 30.0f * pow(t, 4.0f) - 60 * pow(t, 3.0f) + 30 * pow(t, 2.0f);
+    }
+    
+    //Returns the perlin gradient at a position
+    float2 getGradient(inout WorldSpace space, inout TEA baseRNG, float2 worldPosition)
+    {
+        //Get the actual point as defined by the world
+        WorldPoint wPoint = space.getPoint(worldPosition);
+    
+        //Fetch generator for this world point
+        TEA thisRNG = baseRNG;
+        thisRNG.associate(wPoint.packed);
+
+        //Get the random gradient
+        float2 grad;
+        
+        thisRNG.stir();
+        grad.x = thisRNG.getNormFloat();
+        thisRNG.stir();
+        grad.y = thisRNG.getNormFloat();
+
+        return normalize(grad);
+    }
+  
+  //Returns the perlin gradient at a position
+  float3 getGradient(inout WorldSpace space, inout TEA baseRNG, float3 worldPosition)
+  {
+        //Get the actual point as defined by the world
+    WorldPoint3D wPoint = space.getPoint(worldPosition);
+    
+        //Fetch generator for this world point
+    TEA thisRNG = baseRNG;
+    thisRNG.associate(wPoint.packed);
+
+    //Get the random gradient
+    float3 grad;
+        
+    thisRNG.stir();
+    grad.x = thisRNG.getNormFloat();
+    thisRNG.stir();
+    grad.y = thisRNG.getNormFloat();
+    thisRNG.stir();
+    grad.z = thisRNG.getNormFloat();
+
+    return normalize(grad);
+  }
+    
+    //Returns a section representing the current location in perlin noise relative to a provided world position
+	//Position is set to the UV coordinates within the section
+    Section getSection(inout WorldSpace space, inout TEA baseRNG, inout float2 position, float2 perlinOffset, float2 perlinScale)
+    {
+        //Bring world position into perlin space
+        position -= perlinOffset;
+        //Get coefficients of perlin space axes
+        position /= perlinScale;
+
+        Section section;
+        
+        float2 big = float2(0, 0);
+        {
+            //Now get the UV coords and left in perlin space
+            spatialize(position.x, big.x, position.x);
+            spatialize(position.y, big.y, position.y);
+            
+            //In world space the bottom left would be...
+            //BL = perlinOffset + big * perlinScale;
+            //...however this can cause seams due to FP error - delay the calculation!
+        }
+
+        //Calculate the bounds
+        section.BL = perlinOffset + big * perlinScale;
+        section.BR = perlinOffset + (big + float2(1.0f, 0)) * perlinScale;
+        section.TL = perlinOffset + (big + float2(0, 1.0f)) * perlinScale;
+        section.TR = perlinOffset + (big + float2(1.0f, 1.0f)) * perlinScale;
+
+        //Now get the gradients!
+        section.BLgrad = getGradient(space, baseRNG, section.BL);
+        section.BRgrad = getGradient(space, baseRNG, section.BR);
+        section.TLgrad = getGradient(space, baseRNG, section.TL);
+        section.TRgrad = getGradient(space, baseRNG, section.TR);
+
+        return section;
+    }
+  
+  //Returns a section representing the current location in perlin noise relative to a provided world position
+	//Position is set to the UVW coordinates within the section
+  Section3D getSection(inout WorldSpace space, inout TEA baseRNG, inout float3 position, float3 perlinOffset, float3 perlinScale)
+  {
+    //Bring world position into perlin space
+    position -= perlinOffset;
+    //Get coefficients of perlin space axes
+    position /= perlinScale;
+
+    Section3D section;
+        
+    float3 big = float3(0, 0, 0);
+    {
+      //Now get the UVW coords and left in perlin space
+      spatialize(position.x, big.x, position.x);
+      spatialize(position.y, big.y, position.y);
+      spatialize(position.z, big.z, position.z);
+            
+      //In world space the bottom left would be...
+      //BBL = perlinOffset + big * perlinScale;
+      //...however this can cause seams due to FP error - delay the calculation!
+    }
+
+    // Calculate the bounds
+    section.BBL = perlinOffset + big * perlinScale;
+    section.BBR = perlinOffset + (big + float3(1.0f, 0, 0)) * perlinScale;
+    section.BTL = perlinOffset + (big + float3(0, 1.0f, 0)) * perlinScale;
+    section.BTR = perlinOffset + (big + float3(1.0f, 1.0f, 0)) * perlinScale;
+    section.FBL = perlinOffset + (big + float3(0, 0, 1.f)) * perlinScale;
+    section.FBR = perlinOffset + (big + float3(1.0f, 0, 1.f)) * perlinScale;
+    section.FTL = perlinOffset + (big + float3(0, 1.0f, 1.f)) * perlinScale;
+    section.FTR = perlinOffset + (big + float3(1.0f, 1.0f, 1.f)) * perlinScale;
+
+    //Now get the gradients!
+    section.BBLgrad = getGradient(space, baseRNG, section.BBL);
+    section.BBRgrad = getGradient(space, baseRNG, section.BBR);
+    section.BTLgrad = getGradient(space, baseRNG, section.BTL);
+    section.BTRgrad = getGradient(space, baseRNG, section.BTR);
+    section.FBLgrad = getGradient(space, baseRNG, section.FBL);
+    section.FBRgrad = getGradient(space, baseRNG, section.FBR);
+    section.FTLgrad = getGradient(space, baseRNG, section.FTL);
+    section.FTRgrad = getGradient(space, baseRNG, section.FTR);
+
+    return section;
+  }
+    
+    //Returns the value for perlin noise in a section
+    float perlinNoise(inout Section section, float2 UV)
+    {
+        //Change from a linear scale
+        float u = fade(UV.x);
+        float v = fade(UV.y);
+
+        //Bottom edge interpolation
+        float left = dot(section.BLgrad, UV);
+        float right = dot(section.BRgrad, UV - float2(1.0f, 0));
+        float bottom = lerp(left, right, u);
+
+        //Top edge interpolation
+        left = dot(section.TLgrad, UV - float2(0, 1.0f));
+        right = dot(section.TRgrad, UV - float2(1.0f, 1.0f));
+        float top = lerp(left, right, u);
+
+        //Blend between top and bottom vertically
+        return lerp(bottom, top, v);
+    }
+  
+  //Returns the value for perlin noise in a section
+  float perlinNoise(inout Section3D section, float3 UVW)
+  {
+    //Change from a linear scale
+    float u = fade(UVW.x);
+    float v = fade(UVW.y);
+    float w = fade(UVW.z);
+
+    // Back quad
+    float back;
+    {
+      //Bottom edge interpolation
+      float left = dot(section.BBLgrad, UVW);
+      float right = dot(section.BBRgrad, UVW - float3(1., 0, 0));
+      float bottom = lerp(left, right, u);
+
+      //Top edge interpolation
+      left = dot(section.BTLgrad, UVW - float3(0, 1., 0));
+      right = dot(section.BTRgrad, UVW - float3(1., 1., 0));
+      float top = lerp(left, right, u);
+      
+      // Blend between top and bottom vertically
+      back = lerp(bottom, top, v);
+    }
+    
+    // Front quad
+    float front;
+    {
+      //Bottom edge interpolation
+      float left = dot(section.FBLgrad, UVW - float3(0, 0, 1.));
+      float right = dot(section.FBRgrad, UVW - float3(1., 0, 1));
+      float bottom = lerp(left, right, u);
+
+      //Top edge interpolation
+      left = dot(section.FTLgrad, UVW - float3(0, 1., 1.));
+      right = dot(section.FTRgrad, UVW - float3(1., 1., 1.));
+      float top = lerp(left, right, u);
+      
+      // Blend between top and bottom vertically
+      front = lerp(bottom, top, v);
+    }
+
+    // Blend between back and front
+    return lerp(back, front, w);
+  }
+    
+    //Returns the derivative with respect to var of a lerp
+    float lerpDerivative(float x, float xDiff, float y, float yDiff, float var, float varDiff)
+    {
+        float gap = y - x; //Lerp difference
+        float gapDiff = yDiff - xDiff; //Differential in the lerp difference
+        
+        return xDiff + gapDiff * var + gap * varDiff;
+    }
+    
+    //Calculates the u and v partial derivatives of perlin noise
+    float2 perlinNoiseDerivatives(inout Section section, float2 UV)
+    {
+        //Change from a linear scale
+        float u = fade(UV.x);
+        float v = fade(UV.y);
+        
+        //The respective derivatives
+        float uDiff = fadeDerivative(UV.x);
+        float vDiff = fadeDerivative(UV.y);
+        
+        //Note: the dot product derivatives are just the respective gradient component
+        
+        //Bottom edge interpolation
+        float left = dot(section.BLgrad, UV);
+        float right = dot(section.BRgrad, UV - float2(1.0f, 0));
+        float bottom = lerp(left, right, u);
+        
+        //Now the respective derivatives
+        float leftUDiff = section.BLgrad.x;
+        float leftVDiff = section.BLgrad.y;
+        float rightUDiff = section.BRgrad.x;
+        float rightVDiff = section.BRgrad.y;
+        float bottomUDiff = lerpDerivative(left, leftUDiff, right, rightUDiff, u, uDiff);
+        float bottomVDiff = lerpDerivative(left, leftVDiff, right, rightVDiff, u, 0);
+        
+        //Top edge interpolation
+        left = dot(section.TLgrad, UV - float2(0, 1.0f));
+        right = dot(section.TRgrad, UV - float2(1.0f, 1.0f));
+        float top = lerp(left, right, u);
+        
+        //Now the respective derivatives
+        leftUDiff = section.TLgrad.x;
+        leftVDiff = section.TLgrad.y;
+        rightUDiff = section.TRgrad.x;
+        rightVDiff = section.TRgrad.y;
+        float topUDiff = lerpDerivative(left, leftUDiff, right, rightUDiff, u, uDiff);
+        float topVDiff = lerpDerivative(left, leftVDiff, right, rightVDiff, u, 0);
+        
+        //Blend between top and bottom vertically
+        float result = lerp(bottom, top, v);
+        
+        //Now the final derivatives
+        float2 derivatives;
+        derivatives.x = lerpDerivative(bottom, bottomUDiff, top, topUDiff, v, 0);
+        derivatives.y = lerpDerivative(bottom, bottomVDiff, top, topVDiff, v, vDiff);
+        
+        return derivatives;
+    }
+    
+    //Returns the ridged perlin noise value alongside the derivatives
+    float ridgedNoise(inout Section section, inout float2 tangents, float2 UV)
+    {
+        float regular = perlinNoise(section, UV);
+        tangents = perlinNoiseDerivatives(section, UV);
+        
+        //Ridged = 1 - abs(regular)
+        float ridged = 1.0f - abs(regular);
+        
+        //Careful! abs(x) = sign(x)*x
+        //abs'(x) = sign(x) * x'
+        //The absolute function is not continuous, sign(x) must be treated as a constant!
+        tangents *= -sign(regular);
+        
+        return ridged;
+    }
+    
+    //Returns a value similar to ridged noise except smoother (1-p^2)^exp
+    float channelNoise(inout Section section, inout float2 tangents, float2 UV, float exponent)
+    {
+        float regular = perlinNoise(section, UV);
+        tangents = perlinNoiseDerivatives(section, UV);
+        
+        //Square the value to emphasise the boundary
+        tangents *= 2.0f * regular;
+        regular *= regular;
+        
+        //Flip
+        tangents = -tangents;
+        regular = 1.0f - regular;
+        
+        //Raise to the exponent
+        tangents *= exponent * pow(regular, exponent - 1.0f);
+        regular = pow(regular, exponent);
+        
+        return regular;
+    }
+    
+    //Uses two perlin noise grids to calculate a value offset to distort by
+    float2 perturbationNoise(inout WorldSpace space, inout TEA baseRNG, inout float2x2 tangentDerives, float2 position, float2 perlinOffset, float2 perlinScale)
+    {
+        //Generate the offset of the second grid
+        float2 secondOffset;
+        baseRNG.stir();
+        secondOffset.x = perlinScale.x * baseRNG.getFloat();
+        baseRNG.stir();
+        secondOffset.y = perlinScale.y * baseRNG.getFloat();
+        
+        //Two separate generators, one per axis
+        TEA firstRNG = branchRNG(baseRNG);
+        TEA secondRNG = branchRNG(baseRNG);
+        
+        float2 result;
+        
+        //First axis perlin noise
+        float2 perlinPos = position;
+        Section sec = getSection(space, firstRNG, perlinPos, perlinOffset, perlinScale);
+        result.x = perlinNoise(sec, perlinPos);
+        
+        //First row of derivatives
+        tangentDerives._m00_m01 = perlinNoiseDerivatives(sec, perlinPos);
+        
+        //Second axis perlin noise
+        perlinPos = position;
+        sec = getSection(space, secondRNG, perlinPos, secondOffset, perlinScale);
+        result.y = perlinNoise(sec, perlinPos);
+        
+        //Second row of derivatives
+        tangentDerives._m10_m11 = perlinNoiseDerivatives(sec, perlinPos);
+        
+        return result;
+    }
+    
+    //Calculate the perturbation noise without using the tangents
+    float2 perturbationNoise(inout WorldSpace space, inout TEA baseRNG, float2 position, float2 perlinOffset, float2 perlinScale)
+    {
+        float2x2 nullTan = float2x2(0, 0, 0, 0);
+        return perturbationNoise(space, baseRNG, nullTan, position, perlinOffset, perlinScale);
+    }
+    
+}
+
+#define PERLIN_H
+#endif

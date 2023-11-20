@@ -35,8 +35,19 @@ namespace Haboob
     public:
     struct VolumeInfo
     {
-      XMINT3 size = {256,256,256};
+      XMINT3 size = {64,64,64};
       UINT padding;
+
+      // Proc gen params
+      float worldSize = 5.f;
+      float octaves = 3.1f;
+      float fractionalGap = 2.4f;
+      float fractionalIncrement = 1.01f;
+
+      float fbmOffset = .1f;
+      float fbmScale = .4f;
+      float wackyPower = .8f;
+      float wackyScale = .0f;
     };
 
     VolumeGenerationShader();

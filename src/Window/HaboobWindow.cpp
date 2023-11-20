@@ -379,7 +379,19 @@ namespace Haboob
       if (ImGui::CollapsingHeader("Haboob"))
       {
         auto& volumeInfo = haboobVolume.getVolumeInfo();
-        ImGui::DragInt3("Haboob Resolution X", (int*)&volumeInfo.size, .1f, 0, 1024);
+        ImGui::DragInt3("Haboob Resolution", (int*)&volumeInfo.size, .1f, 0, 1024);
+
+        ImGui::DragFloat("Haboob World Size", &volumeInfo.worldSize, .1f, 0, 10.f);
+        ImGui::DragFloat("Haboob Octaves", &volumeInfo.octaves, .1f, .1f, 8.1f);
+        ImGui::DragFloat("Haboob Fractional Gap", &volumeInfo.fractionalGap, .0f, 0, 10.f);
+        ImGui::DragFloat("Haboob Fractional Increment", &volumeInfo.fractionalIncrement, .0f, 0, 10.f);
+
+        ImGui::DragFloat("Haboob FBM Offset", &volumeInfo.fbmOffset, .0f, 0, 10.f);
+        ImGui::DragFloat("Haboob FBM Scale", &volumeInfo.fbmScale, .0f, 0, 10.f);
+
+        ImGui::DragFloat("Haboob Wacky Power (tm)", &volumeInfo.wackyPower, .0f, 0, 10.f);
+        ImGui::DragFloat("Haboob Wacky Scale (tm)", &volumeInfo.wackyScale, .0f, 0, 10.f);
+
         if (ImGui::Button("Regen Haboob"))
         {
           haboobVolume.rebuild(device.getDevice().Get());
