@@ -2,6 +2,8 @@
 #include "../Lighting/LightStructs.lib"
 
 RWTexture2D<float4> screenOut : register(u0);
+Texture3D<float4> volumeTexture : register(t0);
+SamplerState volumeSampler : register(s0);
 
 cbuffer CameraSlot : register(b0)
 {
@@ -40,6 +42,20 @@ struct Sphere
   float sqrRadius;
 };
 
+struct Cube
+{
+  float4 pos;
+  float3 size;
+};
+
+struct Integrator // Simpsons rule
+{
+  float firstTerm;
+  float lastTerm;
+  float odds;
+  float evens;
+};
+
 static float PI = radians(180.);
 
 // The depth to find the ray 'end' at
@@ -59,6 +75,29 @@ void fromHomogeneous(inout float4 vec)
 void march(inout Ray ray, float stepSize)
 {
   ray.pos = ray.pos + ray.dir * stepSize;
+}
+
+void append(inout Integrator inte, float value, uint index)
+{
+  inte.lastTerm = value;
+  if (index % 2 == 0)
+  {
+    inte.evens += value;
+  }
+  else
+  {
+    inte.odds += value;
+  }
+}
+
+float integrate(inout Integrator inte, uint sampleCount)
+{
+  // Note: sample count must always be even
+  float stepSize = 1. / float(sampleCount);
+  float result = inte.firstTerm + inte.lastTerm;
+  result += 4. * inte.odds;
+  result += 2 * (inte.evens - inte.lastTerm);
+  return result * stepSize / 3.;
 }
 
 float3 solveQuadratic(float a, float b, float c)
@@ -97,6 +136,15 @@ float sphereDensitySample(in Ray ray, in Sphere sphere)
 {
   float3 displacement = ray.pos.xyz - sphere.pos.xyz;
   return max(sphere.sqrRadius - dot(displacement, displacement), 0.) / sphere.sqrRadius; // dot(x, x) = |x|^2
+}
+
+float cubeDensitySample(in Ray ray, in Cube cube)
+{
+  // Compute the local coordinates within the cube (TODO: use matrix)
+  float3 localPos = ray.pos.xyz - cube.pos.xyz;
+  localPos.xyz = localPos.xyz / cube.size;
+  
+  return volumeTexture.SampleLevel(volumeSampler, localPos, .5);
 }
 
 float beerLambertAttenuation(float opticalDepth)
@@ -143,8 +191,8 @@ float4 alphaBlend(float4 foreground, float4 background)
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
   // Actually a matrix is probably better here, maybe even rasterisation pass?
-  float2 normScreen = float2(normToSigned(float(threadID.x) * dispatchInfo.outputHorizontalStep),
-                              -normToSigned(float(threadID.y) * dispatchInfo.outputVerticalStep));
+  float2 normScreen = float2(normToSigned((float(threadID.x) + .5f) * dispatchInfo.outputHorizontalStep),
+                              -normToSigned((float(threadID.y) + .5f) * dispatchInfo.outputVerticalStep));
   
   // Form a ray from the screen
   Ray ray;
@@ -164,10 +212,16 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   ray.colour = float4(1., 1., 1., 0.);
   
-  // Test sphere
+  // Test bounding sphere
   Sphere sphere;
-  sphere.pos = float4(0., 0., 1., 1.);
-  sphere.sqrRadius = 1.;
+  sphere.pos = float4(0., 0., 0., 1.);
+  
+  // Test sampling cube
+  Cube cube;
+  cube.size = float3(3., 3., 3.);
+  cube.pos = float4(sphere.pos.xyz - cube.size * float3(.5,.5,.5), 1.); // Shift from centre origin to AABB
+  
+  sphere.sqrRadius = dot(cube.size * float3(.5, .5, .5), cube.size * float3(.5, .5, .5)); // Encapsulate cube
   
   // Compute optimal march params
   MarchParams params;
@@ -185,21 +239,29 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Directional lighting will have a constant phase along the ray
   float3 incomingIntensity = applyScatter(light.diffuse, ray.dir.xyz, light.direction.xyz);
   
+  Integrator absorptionInte;
+  absorptionInte.firstTerm = absorptionInte.odds = absorptionInte.evens = absorptionInte.lastTerm = .0;
+  Integrator intensityInte;
+  intensityInte.firstTerm = intensityInte.odds = intensityInte.evens = intensityInte.lastTerm = .0;
+
   float absorption = 0.;
   float intensity = 0.;
   [loop] // Yeah need to consider this
   for (uint i = 0; i < params.iterations; ++i)
   {
-    float density = opticalInfo.densityCoefficient * sphereDensitySample(ray, sphere);
-    absorption += density * (1. - absorption);
-    if (inSphere(ray, sphere))
-    {
-      intensity += density * beerLambertAttenuation(absorption * opticalInfo.attenuationFactor) * (1. - absorption);
-    }
+    float densitySample = opticalInfo.densityCoefficient * cubeDensitySample(ray, cube);
+    absorption += densitySample;
+    append(absorptionInte, densitySample, i + 1);
+    //if (inSphere(ray, sphere))
+    //{
+    float intensitySample = densitySample * beerLambertAttenuation(integrate(absorptionInte, i + 1) * opticalInfo.attenuationFactor);
+    intensity += intensitySample;
+    append(intensityInte, intensitySample, i + 1);
+    //}
     
     march(ray, params.marchZStep);
   }
   
-  screenOut[threadID.xy] *= beerLambertAttenuation(absorption * opticalInfo.attenuationFactor);
-  screenOut[threadID.xy] += float4(intensity * incomingIntensity, 0.);
+  screenOut[threadID.xy] *= beerLambertAttenuation(integrate(absorptionInte, params.iterations) * opticalInfo.attenuationFactor);
+  screenOut[threadID.xy] += float4(integrate(intensityInte, params.iterations) * incomingIntensity, 0.);
 }

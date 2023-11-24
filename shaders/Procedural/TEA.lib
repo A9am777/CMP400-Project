@@ -1,0 +1,103 @@
+#ifndef TEA_H
+
+#define TEA_STIR 6
+#define TEA_AVALANCHE 32
+class TEA
+{
+    uint delta; //Magic number
+    uint sum; //Rolling value
+    uint2 values; //Values at play in the generator
+
+    uint4 key; //128 bit key
+    
+    void next()
+    {
+        sum += delta;
+        values.x += ((values.y << 4) + key[0]) ^ (values.y + sum) ^ ((values.y >> 5) + key[1]);
+        values.y += ((values.x << 4) + key[2]) ^ (values.x + sum) ^ ((values.x >> 5) + key[3]);
+    }
+    
+    void associate(uint2 newValues)
+    {
+        values = newValues;
+        
+        //Cause the avalanche effect to dissociate from the starting values
+        #if RELEASE
+        [unroll(TEA_AVALANCHE)] //Optimize loop by copying code
+        #endif
+        for (uint i = 0; i < TEA_AVALANCHE; i++)
+        {
+            next();
+        }
+    }
+    
+    //Move onto another random number
+    void stir()
+    {
+        //Run a sufficient number of rounds to get another number
+        #if RELEASE
+        [unroll(TEA_STIR)] //Optimize loop by copying code
+        #endif
+        for (uint i = 0; i < TEA_STIR; i++)
+        {
+            next();
+        }
+    }
+    
+    void seed(uint4 keyValue)
+    {
+        key = keyValue;
+        sum = 0;
+    }
+    
+    //Returns [0, 1]
+    float getFloat()
+    {
+        return float(values.x) / float(uint(~0));
+    }
+    
+    //Returns [-1, 1]
+    float getNormFloat()
+    {
+        return 2.0f * getFloat() - 1.0f;
+    }
+};
+
+//Returns a new RNG which branches off of a main one
+TEA branchRNG(inout TEA baseRNG)
+{
+    TEA branch;
+
+    //Generate half seeds
+    uint4 newSeed;
+    baseRNG.stir();
+    newSeed.xy = baseRNG.values;
+    baseRNG.stir();
+    newSeed.zw = baseRNG.values;
+
+    //Use this as a new seed!
+    branch.seed(newSeed);
+    
+    //Initialise rest
+    branch.delta = baseRNG.delta;
+    branch.sum = baseRNG.sum;
+    branch.values = float2(0, 0);
+
+    return branch;
+}
+
+//Generates a random signed 2d vector based on a range
+float2 generate2Ranged(inout TEA rng, float2 max)
+{
+    float2 returning;
+    
+    rng.stir();
+    returning.x = rng.getNormFloat() * max.x;
+    rng.stir();
+    returning.y = rng.getNormFloat() * max.y;
+    
+    return returning;
+}
+
+#define TEA_H
+#endif

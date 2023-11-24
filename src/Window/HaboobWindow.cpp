@@ -11,7 +11,10 @@ namespace Haboob
   {
     camTest.getMoveRate() = 6.f;
     gbuffer.getGamma() = .2f;
-    gbuffer.getExposure() = 4.f;
+    gbuffer.getExposure() = 2.2f;
+    dirLightPack.diffuse = { 4.96f, 4.92f, 4.14f };
+    dirLightPack.direction = { -1.f, .5f, .0f, 1.f };
+    raymarchShader.getOpticsInfo().colourHGScatter = { .7f, .73f, .65f };
   }
   HaboobWindow::~HaboobWindow()
   {
@@ -43,10 +46,14 @@ namespace Haboob
       testPixelShader->initShader(dev, &shaderManager);
       testComputeShader->initShader(dev, &shaderManager);
       raymarchShader.initShader(dev, &shaderManager);
+      haboobVolume.initShader(dev, &shaderManager);
       
       sphereMesh.build(dev);
       cubeMesh.build(dev);
       planeMesh.build(dev);
+
+      haboobVolume.rebuild(dev);
+      haboobVolume.render(device.getContext().Get());
 
       RenderTarget::copyShader.initShader(dev, &shaderManager);
       GBuffer::toneMapShader.initShader(dev, &shaderManager);
@@ -193,6 +200,9 @@ namespace Haboob
 
       cubeMesh.useBuffers(context);
       cubeMesh.draw(context);
+
+      testVertexShader->unbindShader(context);
+      testPixelShader->unbindShader(context);
     }
   }
 
@@ -269,7 +279,7 @@ namespace Haboob
     raymarchShader.setLightBuffer(lightBuffer);
     raymarchShader.setTarget(&gbuffer.getLitColourTarget());
 
-    raymarchShader.bindShader(context);
+    raymarchShader.bindShader(context, haboobVolume.getShaderView());
     raymarchShader.render(context);
     raymarchShader.unbindShader(context);
   }
@@ -366,13 +376,35 @@ namespace Haboob
         ImGui::DragFloat("Exposure", &gbuffer.getExposure());
       }
 
+      if (ImGui::CollapsingHeader("Haboob"))
+      {
+        auto& volumeInfo = haboobVolume.getVolumeInfo();
+        ImGui::DragInt3("Haboob Resolution", (int*)&volumeInfo.size, .1f, 0, 1024);
+
+        ImGui::DragFloat("Haboob World Size", &volumeInfo.worldSize, .1f, 0, 10.f);
+        ImGui::DragFloat("Haboob Octaves", &volumeInfo.octaves, .1f, .1f, 8.1f);
+        ImGui::DragFloat("Haboob Fractional Gap", &volumeInfo.fractionalGap, .0f, 0, 10.f);
+        ImGui::DragFloat("Haboob Fractional Increment", &volumeInfo.fractionalIncrement, .0f, 0, 10.f);
+
+        ImGui::DragFloat("Haboob FBM Offset", &volumeInfo.fbmOffset, .0f, 0, 10.f);
+        ImGui::DragFloat("Haboob FBM Scale", &volumeInfo.fbmScale, .0f, 0, 10.f);
+
+        ImGui::DragFloat("Haboob Wacky Power (tm)", &volumeInfo.wackyPower, .0f, 0, 10.f);
+        ImGui::DragFloat("Haboob Wacky Scale (tm)", &volumeInfo.wackyScale, .0f, 0, 10.f);
+
+        if (ImGui::Button("Regen Haboob"))
+        {
+          haboobVolume.rebuild(device.getDevice().Get());
+          haboobVolume.render(device.getContext().Get());
+        }
+      }
+
       if (ImGui::CollapsingHeader("Raymarch"))
       {
         auto& marchInfo = raymarchShader.getMarchInfo();
         ImGui::DragFloat("Initial step size", &marchInfo.initialZStep);
         ImGui::DragFloat("Step size", &marchInfo.marchZStep);
         ImGui::DragInt("Step count", (int*)&marchInfo.iterations, .1f, 0, 100);
-
       }
 
       if (ImGui::CollapsingHeader("Optics"))
