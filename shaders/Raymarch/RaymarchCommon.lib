@@ -9,16 +9,18 @@ struct MarchVolumeDispatchInfo
   float outputVerticalStep; // View step per vertical thread
   float initialZStep; // Distance to initially jump in Z
   float marchZStep; // Distance to typically jump in Z
+ 
   uint iterations; // Number of volume steps to take
-  
-  float3 padding;
+  uint flagManualMarch; // Whether to attempt to automatically adjust raymarching or use the manual values
+  float2 padding;
 };
 
 struct BasicOptics
 {
   float attenuationFactor; // Scales optical depth
   float3 colourHGScatter; // Per component light scattering for the HG phase function
-  float densityCoefficient;
+  
+  float densityCoefficient; // Scaling factor of density
   uint flagApplyBeer; // Controls whether to apply Beer-Lambert attenuation
   uint flagApplyHG; // Controls whether to apply the HG phase function
   uint padding;

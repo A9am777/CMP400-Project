@@ -41,21 +41,17 @@ namespace Haboob
     virtual void render();
 
     protected:
-    DisplayDevice device;
-
-    WSTR::VKeys keys;
-    WSTR::MousePointer mouse;
-
     void createD3D();
     void adjustProjection();
 
     LRESULT customRoutine(UINT message, WPARAM wParam, LPARAM lParam) override;
 
-    void redoCameraBuffer(ID3D11DeviceContext* context); // Strictly testing
+    // Strictly for testing purposes - forces the camera buffer to be resent
+    void redoCameraBuffer(ID3D11DeviceContext* context);
 
     void renderBegin();
     void renderOverlay(); // Raymarch environment
-    void renderMirror(); // Copies from mainRender to the back buffer
+    void renderMirror(); // Copies from the gbuffer to the back buffer after applying post process effects
 
     void imguiStart();
     void imguiEnd();
@@ -63,26 +59,34 @@ namespace Haboob
     void imguiFrameEnd();
     void imguiFrameResize();
 
-    void renderTestGUI();
+    void renderGUI();
 
-    GBuffer gbuffer;
+    // Rendering device
+    DisplayDevice device;
+
+    // Input handlers
+    WSTR::VKeys keys;
+    WSTR::MousePointer mouse;
+
+    // Meshes/resources
     SimplePlaneMesh planeMesh;
     SimpleSphereMesh sphereMesh;
     SimpleCubeMesh cubeMesh;
-    Shader* testVertexShader;
-    Shader* testPixelShader;
-    Shader* testComputeShader;
+    VolumeGenerationShader haboobVolume;
+
+    // Scene objects
+    DirectionalLightPack dirLightPack;
+    FreeCam mainCamera;
+    
+    Shader* deferredVertexShader;
+    Shader* deferredPixelShader;
+
+    // Main rendering environment
+    GBuffer gbuffer;
     RaymarchVolumeShader raymarchShader;
     ShaderManager shaderManager;
-
-    // TEST
-    VolumeGenerationShader haboobVolume;
-    XMMATRIX projectionMatrix;
-    XMMATRIX worldMatrix;
-    XMMATRIX viewMatrix;
-    FreeCam camTest;
-    RenderTarget mainRender;
-    DirectionalLightPack dirLightPack;
+    
+    // Reusable buffers
     ComPtr<ID3D11Buffer> cameraBuffer;
     ComPtr<ID3D11Buffer> lightBuffer;
     private:

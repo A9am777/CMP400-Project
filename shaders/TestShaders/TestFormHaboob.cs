@@ -8,6 +8,8 @@ struct VolumeParams
   uint padding;
   
   // Proc gen params
+  uint4 seed;
+  
   float worldSize;
   float octaves;
   float fractionalGap;
@@ -32,7 +34,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   TEA rng;
   rng.delta = 0x9e3779b9;
-  rng.seed(uint4(0x12345, 0xCAFEBABE, 0xDEADBEEF, 0));
+  rng.seed(info.seed);
   rng.associate(uint2(0, 0));
   
   // Compute FBM noise

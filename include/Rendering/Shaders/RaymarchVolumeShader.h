@@ -10,8 +10,10 @@ namespace Haboob
     float outputVerticalStep = 1.f; // View step per vertical thread
     float initialZStep = 0.f; // Distance to jump in Z
     float marchZStep = .1f; // Distance to jump in Z
+    
     UINT iterations = 10; // Number of volume steps to take
-    XMFLOAT3 padding;
+    UINT flagManualMarch = 0; // Whether to attempt to automatically adjust raymarching or use the manual values
+    XMFLOAT2 padding;
   };
 
   struct BasicOptics
@@ -39,6 +41,8 @@ namespace Haboob
       UINT padding;
 
       // Proc gen params
+      XMUINT4 seed = { 0x12345, 0xCAFEBABE, 0xDEADBEEF, 0 };
+
       float worldSize = 5.f;
       float octaves = 3.1f;
       float fractionalGap = 2.4f;

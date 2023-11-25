@@ -7,18 +7,34 @@
 
 namespace Haboob
 {
-  HaboobWindow::HaboobWindow() : imgui{ nullptr }
+  HaboobWindow::HaboobWindow() : imgui{ nullptr }, fps{.0f}
   {
-    camTest.getMoveRate() = 6.f;
+    // Controls
+    mainCamera.getMoveRate() = 6.f;
+    mainCamera.getPosition() = { -8.42f, .93f, -1.41f };
+    mainCamera.getAngles() = { 1.36f, .1f, .0f };
+
+    // Main rendering params
+    mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
     gbuffer.getGamma() = .2f;
-    gbuffer.getExposure() = 2.2f;
-    dirLightPack.diffuse = { 4.96f, 4.92f, 4.14f };
-    dirLightPack.direction = { -1.f, .5f, .0f, 1.f };
-    raymarchShader.getOpticsInfo().colourHGScatter = { .7f, .73f, .65f };
+    gbuffer.getExposure() = 1.3f;
+    dirLightPack.diffuse = { 3.96f, 3.92f, 3.14f };
+    dirLightPack.direction = { -1.f, .25f, .0f, 1.f };
+
+    // Raymarch params
+    raymarchShader.getOpticsInfo().attenuationFactor = 1.54f;
+    raymarchShader.getOpticsInfo().colourHGScatter = { .735f, .732f, .651f };
+    raymarchShader.getOpticsInfo().densityCoefficient = 170.f;
+    raymarchShader.getMarchInfo().iterations = 52;
+
+    // Produce standalone shaders
+    deferredVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV");
+    deferredPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP");
   }
   HaboobWindow::~HaboobWindow()
   {
-
+    delete deferredVertexShader;
+    delete deferredPixelShader;
   }
 
   void HaboobWindow::onStart()
@@ -30,52 +46,48 @@ namespace Haboob
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
 
-
-    camTest.getPosition().y = 1.5f;
-    // TODO: TEST
     {
-      ID3D11Device* dev = device.getDevice().Get();
-
-      mainRender.create(dev, getWidth(), getHeight());
+      auto dev = device.getDevice().Get();
       gbuffer.create(dev, getWidth(), getHeight());
 
-      testVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV");
-      testPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP");
-      testComputeShader = new Shader(Shader::Type::Compute, L"TestShaders/TestComputeScreenDraw");
-      testVertexShader->initShader(dev, &shaderManager);
-      testPixelShader->initShader(dev, &shaderManager);
-      testComputeShader->initShader(dev, &shaderManager);
-      raymarchShader.initShader(dev, &shaderManager);
-      haboobVolume.initShader(dev, &shaderManager);
+      // Initialise all shaders
+      {
+        deferredVertexShader->initShader(dev, &shaderManager);
+        deferredPixelShader->initShader(dev, &shaderManager);
+        raymarchShader.initShader(dev, &shaderManager);
+        haboobVolume.initShader(dev, &shaderManager);
+        RenderTarget::copyShader.initShader(dev, &shaderManager);
+        GBuffer::toneMapShader.initShader(dev, &shaderManager);
+        GBuffer::lightShader.initShader(dev, &shaderManager);
+      }
       
-      sphereMesh.build(dev);
-      cubeMesh.build(dev);
-      planeMesh.build(dev);
+      // Generate assets
+      {
+        sphereMesh.build(dev);
+        cubeMesh.build(dev);
+        planeMesh.build(dev);
 
-      haboobVolume.rebuild(dev);
-      haboobVolume.render(device.getContext().Get());
+        haboobVolume.rebuild(dev);
+        haboobVolume.render(device.getContext().Get());
+      }
 
-      RenderTarget::copyShader.initShader(dev, &shaderManager);
-      GBuffer::toneMapShader.initShader(dev, &shaderManager);
-      GBuffer::lightShader.initShader(dev, &shaderManager);
-    }
+      // Create buffers
+      {
+        // Camera buffer
+        D3D11_BUFFER_DESC bufferDesc;
+        HRESULT result = S_OK; // unused
+        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+        bufferDesc.ByteWidth = sizeof(CameraPack);
+        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        bufferDesc.MiscFlags = 0;
+        bufferDesc.StructureByteStride = 0;
+        result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, cameraBuffer.ReleaseAndGetAddressOf());
 
-    // TEST
-    {
-      // Camera buffer
-      D3D11_BUFFER_DESC bufferDesc;
-      HRESULT result = S_OK; // unused
-      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-      bufferDesc.ByteWidth = sizeof(CameraPack);
-      bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-      bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-      bufferDesc.MiscFlags = 0;
-      bufferDesc.StructureByteStride = 0;
-      result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, cameraBuffer.ReleaseAndGetAddressOf());
-
-      // Light buffer
-      bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
-      result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, lightBuffer.ReleaseAndGetAddressOf());
+        // Light buffer
+        bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
+        result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, lightBuffer.ReleaseAndGetAddressOf());
+      }
     }
 
     lastFrame = Clock::now();
@@ -104,14 +116,14 @@ namespace Haboob
     // Handle rendering
     {
       imguiFrameBegin();
-
       renderBegin();
-      render();
-      device.setBackBufferTarget(); // Safety
-      renderOverlay();
-      renderMirror();
 
-      renderTestGUI();
+        render();
+        device.setBackBufferTarget(); // Safety
+        renderOverlay();
+        renderMirror();
+
+        renderGUI();
 
       imguiFrameEnd();
       device.swapBuffer();
@@ -132,6 +144,7 @@ namespace Haboob
 
     adjustProjection();
 
+    // Adjust the window rect
     RECT rect;
     GetClientRect(wHandle, &rect);
     InvalidateRect(wHandle, &rect, TRUE);
@@ -163,7 +176,7 @@ namespace Haboob
   {
     if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) { return; }
 
-    camTest.update(dt, &keys, &mouse);
+    mainCamera.update(dt, &keys, &mouse);
   }
 
   void HaboobWindow::update(float dt)
@@ -175,35 +188,33 @@ namespace Haboob
   {
     ID3D11DeviceContext* context = device.getContext().Get();
 
-    // TEST
+    // Render the opaque scene in a dirty way
+    deferredVertexShader->bindShader(context);
+    deferredPixelShader->bindShader(context);
     {
-      testVertexShader->bindShader(context);
-      testPixelShader->bindShader(context);
-
       context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
       context->PSSetConstantBuffers(0, 1, lightBuffer.GetAddressOf());
 
-      camTest.setWorld(XMMatrixIdentity() * XMMatrixTranslation(spherePos[0], spherePos[1], spherePos[2]));
+      mainCamera.setWorld(XMMatrixIdentity() * XMMatrixTranslation(spherePos[0], spherePos[1], spherePos[2]));
       redoCameraBuffer(context);
 
       sphereMesh.useBuffers(context);
       sphereMesh.draw(context);
 
-      camTest.setWorld(XMMatrixScaling(5.f, 5.f, 1.f) * XMMatrixLookToLH(XMVectorZero(), XMVectorSet(.0f, 1.f, .0f, 1.f), XMVectorSet(.0f, .0f, -1.f, 1.f)) * XMMatrixTranslation(.0f, -1.f, .0f));
+      mainCamera.setWorld(XMMatrixScaling(5.f, 5.f, 1.f) * XMMatrixLookToLH(XMVectorZero(), XMVectorSet(.0f, 1.f, .0f, 1.f), XMVectorSet(.0f, .0f, -1.f, 1.f)) * XMMatrixTranslation(.0f, -1.f, .0f));
       redoCameraBuffer(context);
 
       planeMesh.useBuffers(context);
       planeMesh.draw(context);
 
-      camTest.setWorld(XMMatrixTranslation(-2.f, 1.5f, .0f));
+      mainCamera.setWorld(XMMatrixTranslation(-2.f, 1.5f, .0f));
       redoCameraBuffer(context);
 
       cubeMesh.useBuffers(context);
       cubeMesh.draw(context);
-
-      testVertexShader->unbindShader(context);
-      testPixelShader->unbindShader(context);
     }
+    deferredVertexShader->unbindShader(context);
+    deferredPixelShader->unbindShader(context);
   }
 
   void HaboobWindow::createD3D()
@@ -219,8 +230,6 @@ namespace Haboob
 
   void HaboobWindow::adjustProjection()
   {
-    mainRender.resize(device.getDevice().Get(), getWidth(), getHeight());
-
     gbuffer.resize(device.getDevice().Get(), getWidth(), getHeight());
 
     // Setup the projection matrix.
@@ -229,7 +238,7 @@ namespace Haboob
 
     float nearZ = .1f;
     float farZ = 100.f;
-    camTest.setProjection(XMMatrixPerspectiveFovLH(fov, screenAspect, nearZ, farZ));
+    mainCamera.setProjection(XMMatrixPerspectiveFovLH(fov, screenAspect, nearZ, farZ));
   }
 
   LRESULT HaboobWindow::customRoutine(UINT message, WPARAM wParam, LPARAM lParam)
@@ -243,7 +252,7 @@ namespace Haboob
     {
       D3D11_MAPPED_SUBRESOURCE mapped;
       HRESULT result = context->Map(cameraBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-      camTest.putPack(mapped.pData);
+      mainCamera.putPack(mapped.pData);
       context->Unmap(cameraBuffer.Get(), 0);
     }
   }
@@ -259,7 +268,7 @@ namespace Haboob
 
   void HaboobWindow::renderOverlay()
   {
-    ID3D11DeviceContext* context = device.getContext().Get();
+    auto context = device.getContext().Get();
 
     // Light data
     {
@@ -267,18 +276,21 @@ namespace Haboob
       HRESULT result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
       std::memcpy(mapped.pData, &dirLightPack, sizeof(DirectionalLightPack));
 
+      // Normalise direction before sending
       XMVECTOR vec = XMLoadFloat4(&dirLightPack.direction);
       vec = XMVector3Normalize(vec);
       XMStoreFloat4(&reinterpret_cast<DirectionalLightPack*>(mapped.pData)->direction, vec);
 
       context->Unmap(lightBuffer.Get(), 0);
     }
+    // Basic lit pass
     gbuffer.lightPass(context, lightBuffer.Get());
 
     raymarchShader.setCameraBuffer(cameraBuffer);
     raymarchShader.setLightBuffer(lightBuffer);
     raymarchShader.setTarget(&gbuffer.getLitColourTarget());
 
+    // Raymarch!
     raymarchShader.bindShader(context, haboobVolume.getShaderView());
     raymarchShader.render(context);
     raymarchShader.unbindShader(context);
@@ -345,20 +357,20 @@ namespace Haboob
     }
   }
 
-  void HaboobWindow::renderTestGUI()
+  void HaboobWindow::renderGUI()
   {
     if (ImGui::Begin("DEBUGWINDOW", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
-      ImGui::Text("fps: %f", fps);
+      ImGui::Text("FPS: %f", fps);
       ImGui::Text("Hello World");
       ImGui::DragFloat3("Sphere Pos", spherePos, 1.f, -10.f, 10.f);
 
       if (ImGui::CollapsingHeader("Camera"))
       {
-        ImGui::DragFloat3("Camera Pos", &camTest.getPosition().x, 1.f, -10.f, 10.f);
-        ImGui::DragFloat2("Camera Rot", &camTest.getAngles().x, XM_PI * .01f, -XM_PI, XM_PI);
-        ImGui::DragFloat("Camera Speed", &camTest.getMoveRate());
-        ImGui::DragFloat("Camera Look Speed", &camTest.getMouseSensitivity());
+        ImGui::DragFloat3("Camera Pos", &mainCamera.getPosition().x, 1.f, -10.f, 10.f);
+        ImGui::DragFloat2("Camera Rot", &mainCamera.getAngles().x, XM_PI * .01f, -XM_PI, XM_PI);
+        ImGui::DragFloat("Camera Speed", &mainCamera.getMoveRate());
+        ImGui::DragFloat("Camera Look Speed", &mainCamera.getMouseSensitivity());
       }
 
       if (ImGui::CollapsingHeader("Raster State"))
@@ -380,6 +392,8 @@ namespace Haboob
       {
         auto& volumeInfo = haboobVolume.getVolumeInfo();
         ImGui::DragInt3("Haboob Resolution", (int*)&volumeInfo.size, .1f, 0, 1024);
+
+        ImGui::DragScalarN("Haboob Seed", ImGuiDataType_U32, &volumeInfo.seed, 4);
 
         ImGui::DragFloat("Haboob World Size", &volumeInfo.worldSize, .1f, 0, 10.f);
         ImGui::DragFloat("Haboob Octaves", &volumeInfo.octaves, .1f, .1f, 8.1f);
@@ -405,13 +419,14 @@ namespace Haboob
         ImGui::DragFloat("Initial step size", &marchInfo.initialZStep);
         ImGui::DragFloat("Step size", &marchInfo.marchZStep);
         ImGui::DragInt("Step count", (int*)&marchInfo.iterations, .1f, 0, 100);
+        ImGui::CheckboxFlags("Use manual step", &marchInfo.flagManualMarch, ~0);
       }
 
       if (ImGui::CollapsingHeader("Optics"))
       {
         auto& opticsInfo = raymarchShader.getOpticsInfo();
-        ImGui::DragFloat("Beer attenuation factor", &opticsInfo.attenuationFactor);
         ImGui::DragFloat3("Henyey-Greenstein phase coefficients", &opticsInfo.colourHGScatter.x, .01f, .0f, 1.f);
+        ImGui::DragFloat("Beer attenuation factor", &opticsInfo.attenuationFactor);
         ImGui::DragFloat("Density Coefficient", &opticsInfo.densityCoefficient);
         ImGui::CheckboxFlags("Apply beer", &opticsInfo.flagApplyBeer, ~0);
         ImGui::CheckboxFlags("Apply HG", &opticsInfo.flagApplyHG, ~0);

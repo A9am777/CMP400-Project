@@ -223,10 +223,16 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   sphere.sqrRadius = dot(cube.size * float3(.5, .5, .5), cube.size * float3(.5, .5, .5)); // Encapsulate cube
   
-  // Compute optimal march params
+  // Set march params
   MarchParams params;
   params.iterations = dispatchInfo.iterations;
-  determineSphereParams(params, ray, sphere);
+  params.marchZStep = dispatchInfo.marchZStep;
+  params.initialStep = dispatchInfo.initialZStep;
+  if (!dispatchInfo.flagManualMarch)
+  {
+    // Use the bounding sphere to approximate better params
+    determineSphereParams(params, ray, sphere);
+  }
   
   if(params.mask)
   {
