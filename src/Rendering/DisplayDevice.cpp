@@ -17,13 +17,14 @@ namespace Haboob
 
   DisplayDevice::DisplayDevice() : featureLevel{D3D_FEATURE_LEVEL_1_0_CORE}, backBufferViewport{}, rasterState{RASTER_STATE_DEFAULT}
   {
-
+    orthoMatrix = XMMatrixIdentity();
   }
 
   HRESULT DisplayDevice::create(UINT flags, const std::vector<D3D_FEATURE_LEVEL>& featureLevelRequest)
   {
     if (device || deviceContext) { return NTE_EXISTS; }
     HRESULT result = S_OK;
+    
     #if DEBUGFLAG
     flags |= D3D11_CREATE_DEVICE_DEBUG;
     #endif
@@ -62,7 +63,7 @@ namespace Haboob
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.SampleDesc.Count = 1;
     desc.SampleDesc.Quality = 0;
-    desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD; // ImGui forced
+    desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD; // ImGui forced :(
     desc.OutputWindow = context;
 
     return makeSwapChain(context, desc);
@@ -148,7 +149,7 @@ namespace Haboob
 
   void DisplayDevice::clearBackBuffer()
   {
-    const FLOAT red[4] = { 1.0f, 0.1f, 0.1f, 1.0f };
+    static const FLOAT red[4] = { 1.0f, 0.1f, 0.1f, 1.0f };
     deviceContext->ClearRenderTargetView(backBufferTarget.Get(), red);
     deviceContext->ClearDepthStencilView(depthBufferView.Get(), D3D11_CLEAR_DEPTH, 1.f, 0);
   }

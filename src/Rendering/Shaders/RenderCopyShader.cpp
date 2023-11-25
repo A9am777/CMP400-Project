@@ -96,5 +96,4 @@ namespace Haboob
   {
     matrices.worldMatrix = XMMatrixScaling(float(view.Width), float(view.Height), 1.f) * XMMatrixTranslation(view.TopLeftX, view.TopLeftY, .0f);
   }
-
 }

@@ -104,6 +104,7 @@ namespace Haboob
 
     return result;
   }
+
   HRESULT RenderTarget::resize(ID3D11Device* device, UInt width, UInt height)
   {
     if (!texture) { return E_INVALIDARG; }
@@ -113,6 +114,7 @@ namespace Haboob
 
     return create(device, width, height, textureDesc);
   }
+
   void RenderTarget::renderFrom(ID3D11DeviceContext* context)
   {
     copyShader.setViewport(textureViewport);

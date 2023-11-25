@@ -7,6 +7,7 @@
 
 namespace Haboob
 {
+  // Copies texels from a texture to a target
   class RenderCopyShader
   {
     public:

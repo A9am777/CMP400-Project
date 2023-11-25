@@ -11,5 +11,4 @@ namespace Haboob
     XMMATRIX inverseProjectionMatrix;
     XMMATRIX inverseViewProjectionMatrix;
   };
-
 }

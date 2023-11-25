@@ -9,6 +9,4 @@ namespace Haboob
     XMFLOAT2 texture;
     XMFLOAT3 normal;
   };
-
-
 }

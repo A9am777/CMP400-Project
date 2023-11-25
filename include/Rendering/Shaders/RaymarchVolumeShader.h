@@ -32,12 +32,13 @@ namespace Haboob
     BasicOptics opticalInfo;
   };
 
+  // Generates a Haboob to a 3d texture
   class VolumeGenerationShader
   {
     public:
     struct VolumeInfo
     {
-      XMINT3 size = {64,64,64};
+      XMINT3 size = {64, 64, 64}; // Texture size
       UINT padding;
 
       // Proc gen params
@@ -79,6 +80,7 @@ namespace Haboob
     VolumeInfo volumeInfo;
   };
 
+  // Renders a raymarched 3d volume
   class RaymarchVolumeShader
   {
     public:

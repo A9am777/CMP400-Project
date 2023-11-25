@@ -3,6 +3,7 @@
 #include "RenderTarget.h"
 namespace Haboob
 {
+  // Reinhard tone mapping from HDR to LDR
   class ToneMapShader : Shader
   {
     public:
@@ -25,9 +26,9 @@ namespace Haboob
     };
     TonePack toneInfo;
     ComPtr<ID3D11Buffer> toneBuffer;
-
   };
 
+  // Renders additive lighting over a GBuffer to a lit colour buffer
   class LightPassShader : public Shader
   {
     public:
@@ -70,6 +71,5 @@ namespace Haboob
     RenderTarget litColourTarget; // colour(r, g, b), alpha
     float gamma;
     float exposure;
-
   };
 }
