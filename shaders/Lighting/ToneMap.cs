@@ -1,4 +1,4 @@
-cbuffer toneValues : register(b0)
+cbuffer ToneValues : register(b0)
 {
   float gamma;
   float exposure;

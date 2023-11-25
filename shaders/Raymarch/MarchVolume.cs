@@ -21,46 +21,6 @@ cbuffer LightSlot : register(b2)
   DirectionalLight light;
 }
 
-struct MarchParams
-{
-  float initialStep;
-  float marchZStep;
-  uint iterations;
-  bool mask;
-};
-
-struct Ray
-{
-  float4 pos;
-  float4 dir;
-  float4 colour;
-};
-
-struct Sphere
-{
-  float4 pos;
-  float sqrRadius;
-};
-
-struct Cube
-{
-  float4 pos;
-  float3 size;
-};
-
-struct Integrator // Simpsons rule
-{
-  float firstTerm;
-  float lastTerm;
-  float odds;
-  float evens;
-};
-
-static float PI = radians(180.);
-
-// The depth to find the ray 'end' at
-#define ZDirectionTest .01
-
 // Converts [0, 1] to [-1, 1]
 float normToSigned(float norm)
 {
