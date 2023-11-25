@@ -107,6 +107,7 @@ float cubeDensitySample(in Ray ray, in Cube cube)
   return volumeTexture.SampleLevel(volumeSampler, localPos, .5);
 }
 
+// Beer-Lambert law
 float beerLambertAttenuation(float opticalDepth)
 {
   return opticalInfo.flagApplyBeer ? exp(-opticalDepth) : 1.;
@@ -169,14 +170,13 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     // Create a normalised direction vector
     ray.dir = normalize(directionPointTarget - ray.pos);
   }
-  
   ray.colour = float4(1., 1., 1., 0.);
   
-  // Test bounding sphere
+  // Bounding sphere
   Sphere sphere;
   sphere.pos = float4(0., 0., 0., 1.);
   
-  // Test sampling cube
+  // Sampling cube
   Cube cube;
   cube.size = float3(3., 3., 3.);
   cube.pos = float4(sphere.pos.xyz - cube.size * float3(.5,.5,.5), 1.); // Shift from centre origin to AABB
@@ -185,21 +185,23 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Set march params
   MarchParams params;
-  params.iterations = dispatchInfo.iterations;
+  params.iterations = dispatchInfo.iterations * 2; // *Must* be a multiple of 2
   params.marchZStep = dispatchInfo.marchZStep;
   params.initialStep = dispatchInfo.initialZStep;
+  params.mask = 0;
   if (!dispatchInfo.flagManualMarch)
   {
     // Use the bounding sphere to approximate better params
     determineSphereParams(params, ray, sphere);
   }
   
+  // Exit now if possible
   if(params.mask)
   {
     return;
   }
   
-  // Jump forward
+  // Jump ray forward
   march(ray, params.initialStep);
   
   // Directional lighting will have a constant phase along the ray
@@ -209,25 +211,28 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   absorptionInte.firstTerm = absorptionInte.odds = absorptionInte.evens = absorptionInte.lastTerm = .0;
   Integrator intensityInte;
   intensityInte.firstTerm = intensityInte.odds = intensityInte.evens = intensityInte.lastTerm = .0;
-
-  float absorption = 0.;
-  float intensity = 0.;
-  [loop] // Yeah need to consider this
+  
+  [loop] // Yeah need to consider this impact
   for (uint i = 0; i < params.iterations; ++i)
   {
-    float densitySample = opticalInfo.densityCoefficient * cubeDensitySample(ray, cube);
-    absorption += densitySample;
-    append(absorptionInte, densitySample, i + 1);
-    //if (inSphere(ray, sphere))
-    //{
-    float intensitySample = densitySample * beerLambertAttenuation(integrate(absorptionInte, i + 1) * opticalInfo.attenuationFactor);
-    intensity += intensitySample;
-    append(intensityInte, intensitySample, i + 1);
-    //}
+    // The true index within simpson's integral
+    uint sampleInteIndex = i + 1;
     
+    // Accumulate density
+    float densitySample = opticalInfo.densityCoefficient * cubeDensitySample(ray, cube);
+    append(absorptionInte, densitySample, sampleInteIndex);
+    
+    // Accumulate intensity as a function of density
+    // (note: simpsons rule is broken here due to odd sample count integration, however it appears more stable to allow this)
+    float intensitySample = densitySample * beerLambertAttenuation(integrate(absorptionInte, sampleInteIndex) * opticalInfo.attenuationFactor);
+    append(intensityInte, intensitySample, sampleInteIndex);
+    
+    // March again!
     march(ray, params.marchZStep);
   }
   
+  // Apply scattering to incoming background irradiance
   screenOut[threadID.xy] *= beerLambertAttenuation(integrate(absorptionInte, params.iterations) * opticalInfo.attenuationFactor);
+  // Add scattering from the volume itself
   screenOut[threadID.xy] += float4(integrate(intensityInte, params.iterations) * incomingIntensity, 0.);
 }

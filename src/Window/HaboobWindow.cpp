@@ -25,7 +25,7 @@ namespace Haboob
     raymarchShader.getOpticsInfo().attenuationFactor = 1.54f;
     raymarchShader.getOpticsInfo().colourHGScatter = { .735f, .732f, .651f };
     raymarchShader.getOpticsInfo().densityCoefficient = 170.f;
-    raymarchShader.getMarchInfo().iterations = 52;
+    raymarchShader.getMarchInfo().iterations = 26;
 
     // Produce standalone shaders
     deferredVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV");
