@@ -139,7 +139,7 @@ namespace Haboob
   {
     if (device.getContext())
     {
-      assert(device.resizeBackBuffer(getWidth(), getHeight()) == S_OK);
+      device.resizeBackBuffer(getWidth(), getHeight());
     }
 
     adjustProjection();
@@ -219,10 +219,10 @@ namespace Haboob
 
   void HaboobWindow::createD3D()
   {
-    assert(!FAILED(device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT)));
-    assert(!FAILED(device.makeSwapChain(wHandle)));
-    assert(!FAILED(device.resizeBackBuffer(getWidth(), getHeight())));
-    assert(!FAILED(device.makeStates()));
+    device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT);
+    device.makeSwapChain(wHandle);
+    device.resizeBackBuffer(getWidth(), getHeight());
+    device.makeStates();
 
     mainRasterMode = static_cast<UInt>(device.getRasterState());
     adjustProjection();
@@ -314,8 +314,8 @@ namespace Haboob
     if (imgui = ImGui::CreateContext())
     {
       ImGui::SetCurrentContext(imgui);
-      assert(ImGui_ImplWin32_Init(wHandle));
-      assert(ImGui_ImplDX11_Init(device.getDevice().Get(), device.getContext().Get()));
+      ImGui_ImplWin32_Init(wHandle);
+      ImGui_ImplDX11_Init(device.getDevice().Get(), device.getContext().Get());
       ImGui::GetIO().Fonts->AddFontDefault();
       ImGui::GetIO().Fonts->Build();
       ImGui_ImplDX11_CreateDeviceObjects();
