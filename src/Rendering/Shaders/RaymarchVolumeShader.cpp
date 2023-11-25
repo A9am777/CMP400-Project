@@ -203,7 +203,8 @@ namespace Haboob
   {
     generateVolumeShader->bindShader(context);
     bindShader(context);
-    Shader::dispatch(context, volumeInfo.size.x, volumeInfo.size.y, volumeInfo.size.z);
+    static const int groupSize = 8;
+    Shader::dispatch(context, volumeInfo.size.x / groupSize, volumeInfo.size.y / groupSize, volumeInfo.size.z / groupSize);
     unbindShader(context);
     generateVolumeShader->unbindShader(context);
   }

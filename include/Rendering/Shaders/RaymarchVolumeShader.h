@@ -38,7 +38,7 @@ namespace Haboob
     public:
     struct VolumeInfo
     {
-      XMINT3 size = {64, 64, 64}; // Texture size
+      XMINT3 size = {128, 128, 128}; // Texture size
       UINT padding;
 
       // Proc gen params
