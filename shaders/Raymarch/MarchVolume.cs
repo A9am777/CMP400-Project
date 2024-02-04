@@ -191,6 +191,16 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Jump ray forward
   march(ray, params.initialStep);
   
+  float4x4 identity = float4x4(
+  1., .0, .0, .0,
+  .0, 1., .0, .0,
+  .0, .0, 1., .0,
+  .0, .0, .0, 1.
+  );
+  
+  
+  float4x4 wavelengths = opticalInfo.spectralWavelengths / 0.743f;
+  
   // Directional lighting will have a constant phase along the ray
   float angularDistance = dot(ray.dir.xyz, -light.direction.xyz);
   float4 incomingForwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicForwardTerms) * float4(light.diffuse, light.diffuse.r);
@@ -222,7 +232,11 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     
     if (opticalInfo.flagApplySpectral)
     {
-      irradianceSample = mul((ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms)), opticalInfo.spectralWeights * Transmission(referenceOpticalDepth * spectralScatter(opticalInfo.spectralWavelengths, opticalInfo.absorptionAngstromExponent)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(opticalInfo.spectralWavelengths, opticalInfo.scatterAngstromExponent)));
+      float4x4 baseRadiance = mul(identity, (float1x4)(ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms)));
+      float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, opticalInfo.absorptionAngstromExponent)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, opticalInfo.scatterAngstromExponent));
+      float4x4 integratorRadiance = mul(transmissions, baseRadiance) * opticalInfo.spectralWeights;
+      
+      irradianceSample = mul(float1x4(1., 1., 1., 1.), integratorRadiance);
     }
     else
     {

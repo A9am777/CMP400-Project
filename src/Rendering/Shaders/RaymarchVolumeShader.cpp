@@ -142,13 +142,13 @@ namespace Haboob
       {
         if (wavelet == 1) // Green = linear
         {
-          optics.spectralWeights.m[wavelet][term] = hermitGaussWeights[term] * linearWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
-          optics.spectralWavelengths.m[wavelet][term] = linearAbscissasAdjust(hermitGaussAbscissas[term], distribution);
+          optics.spectralWeights.m[term][wavelet] = hermitGaussWeights[term] * linearWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
+          optics.spectralWavelengths.m[term][wavelet] = linearAbscissasAdjust(hermitGaussAbscissas[term], distribution);
         }
         else // Everything else = logarithmic
         {
-          optics.spectralWeights.m[wavelet][term] = hermitGaussWeights[term] * logWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
-          optics.spectralWavelengths.m[wavelet][term] = logAbscissasAdjust(hermitGaussAbscissas[term], distribution);
+          optics.spectralWeights.m[term][wavelet] = hermitGaussWeights[term] * logWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
+          optics.spectralWavelengths.m[term][wavelet] = logAbscissasAdjust(hermitGaussAbscissas[term], distribution);
         }
       }
     }
