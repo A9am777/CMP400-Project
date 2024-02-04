@@ -6,6 +6,7 @@ namespace Haboob
   {
     computeShader = new Shader(Shader::Type::Compute, L"Raymarch/MarchVolume");
     renderTarget = nullptr;
+    buildSpectralMatrices();
   }
 
   RaymarchVolumeShader::~RaymarchVolumeShader()
@@ -99,6 +100,58 @@ namespace Haboob
   void RaymarchVolumeShader::render(ID3D11DeviceContext* context) const
   {
     computeShader->dispatch(context, renderTarget->getWidth(), renderTarget->getHeight());
+  }
+
+  void RaymarchVolumeShader::buildSpectralMatrices()
+  {
+    // Hermit-Gauss quadrature of order n=4
+    float hermitGaussAbscissas[4] = { 0.524647623275f, -0.524647623275f, 1.650680123886f, -1.650680123886f };
+    float hermitGaussWeights[4] = { 0.804914090006f, 0.804914090006f, 0.0813128354473f, 0.0813128354473f };
+
+    // Substitution is in order
+    auto logAbscissasAdjust = [](float abscissas, float distributionCoefficients[4]) -> float {
+      return (exp(abscissas / distributionCoefficients[1]) - distributionCoefficients[3]) / distributionCoefficients[2];
+    };
+    auto linearAbscissasAdjust = [](float abscissas, float distributionCoefficients[4]) -> float {
+      return (abscissas - distributionCoefficients[3]) / distributionCoefficients[2];
+    };
+    auto logWeight = [](float abscissas, float distributionCoefficients[4]) -> float {
+      return exp(abscissas / distributionCoefficients[1]) / (distributionCoefficients[1] * distributionCoefficients[2]);
+    };
+    auto linearWeight = [](float abscissas, float distributionCoefficients[4]) -> float {
+      return 1.f / distributionCoefficients[2];
+    };
+
+    auto& optics = getOpticsInfo();
+    for (size_t wavelet = 0; wavelet < 4; ++wavelet)
+    {
+      float* distribution = nullptr;
+      switch (wavelet)
+      {
+        case 0: distribution = redMajorCIECoefficients;
+        break;
+        case 1: distribution = greenCIECoefficients;
+        break;
+        case 2: distribution = blueCIECoefficients;
+        break;
+        case 3: distribution = redMinorCIECoefficients;
+        break;
+      }
+
+      for (size_t term = 0; term < 4; ++term)
+      {
+        if (wavelet == 1) // Green = linear
+        {
+          optics.spectralWeights.m[wavelet][term] = hermitGaussWeights[term] * linearWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
+          optics.spectralWavelengths.m[wavelet][term] = linearAbscissasAdjust(hermitGaussAbscissas[term], distribution);
+        }
+        else // Everything else = logarithmic
+        {
+          optics.spectralWeights.m[wavelet][term] = hermitGaussWeights[term] * logWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
+          optics.spectralWavelengths.m[wavelet][term] = logAbscissasAdjust(hermitGaussAbscissas[term], distribution);
+        }
+      }
+    }
   }
 
   VolumeGenerationShader::VolumeGenerationShader()

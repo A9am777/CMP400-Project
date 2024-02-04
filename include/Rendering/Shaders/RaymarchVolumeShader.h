@@ -18,12 +18,21 @@ namespace Haboob
 
   struct BasicOptics
   {
-    float attenuationFactor = 1.f; // Scales optical depth
-    XMFLOAT3 colourHGScatter = { 1.f, 1.f, 1.f }; // Per component light scattering for the HG phase function
-    float densityCoefficient = 1.f; // Scaling factor of density
-    UINT flagApplyBeer = ~0; // Controls whether to apply Beer-Lambert attenuation
-    UINT flagApplyHG = ~0; // Controls whether to apply the HG phase function
-    UINT padding;
+    XMFLOAT4 anisotropicForwardTerms; // Forward anisotropic parameters per major light component
+    XMFLOAT4 anisotropicBackwardTerms; // Backward anisotropic parameters per major light component
+    XMFLOAT4 phaseBlendWeightTerms; // Per component phase blend factor
+
+    float scatterAngstromExponent;
+    float absorptionAngstromExponent;
+    float attenuationFactor; // Scales optical depth
+    float powderCoefficient; // Beers-Powder scaling factor
+    XMFLOAT4X4 spectralWavelengths; // Wavelengths to integrate over
+    XMFLOAT4X4 spectralWeights; // Spectral integration weights
+
+    UINT flagApplyBeer; // Controls whether to apply Beer-Lambert attenuation
+    UINT flagApplyHG; // Controls whether to apply the HG phase function
+    UINT flagApplySpectral; // Controls whether to integrate over several wavelengths
+    float referenceWavelength;
   };
 
   struct ComprehensiveBufferInfo
@@ -100,6 +109,8 @@ namespace Haboob
     inline MarchVolumeDispatchInfo& getMarchInfo() { return marchInfo; }
     inline BasicOptics& getOpticsInfo() { return opticsInfo; }
 
+    void buildSpectralMatrices();
+
     private:
     Shader* computeShader;
     RenderTarget* renderTarget;
@@ -109,5 +120,11 @@ namespace Haboob
     ComPtr<ID3D11Buffer> marchBuffer;
     ComPtr<ID3D11Buffer> cameraBuffer;
     ComPtr<ID3D11Buffer> lightBuffer;
+
+    // Coefficients of CIE functions in order {scale, exponentScale, wavelengthScale, wavelengthOffset}
+    float redMinorCIECoefficients[4] = { 0.398f, 35.3553f, 0.4931f, 0.8581f };
+    float redMajorCIECoefficients[4] = { 1.132f, 15.2971f, -0.6725f, 1.3961f };
+    float greenCIECoefficients[4] = { 1.011f, 1.f, 7.6626f, -3.9248f };
+    float blueCIECoefficients[4] = { 2.060f, 5.6569f, 2.7716f, 0.1896f };
   };
 }
