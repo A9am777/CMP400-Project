@@ -122,9 +122,9 @@ namespace Haboob
     ComPtr<ID3D11Buffer> lightBuffer;
 
     // Coefficients of CIE functions in order {scale, exponentScale, wavelengthScale, wavelengthOffset}
-    float redMinorCIECoefficients[4] = { 0.398f, 35.3553f, 0.4931f, 0.8581f };
-    float redMajorCIECoefficients[4] = { 1.132f, 15.2971f, -0.6725f, 1.3961f };
-    float greenCIECoefficients[4] = { 1.011f, 1.f, 7.6626f, -3.9248f };
-    float blueCIECoefficients[4] = { 2.060f, 5.6569f, 2.7716f, -0.1896f };
+    float redMinorCIECoefficients[4] = { 0.39800f, 35.35534f, 0.78895f, 0.56223f };
+    float redMajorCIECoefficients[4] = { 1.13200f, 15.29706f, -1.07599f, 1.79960f };
+    float greenCIECoefficients[4] = { 1.01100f, 1.f, 12.2602f, -8.52237f };
+    float blueCIECoefficients[4] = { 2.06000f, 5.65685f, 4.43459f, -1.47339f };
   };
 }
