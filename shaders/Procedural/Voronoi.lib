@@ -1,0 +1,729 @@
+#ifndef VORONOI_H
+
+#include "TEA.hlsli"
+#include "World.hlsli"
+#include "Triangle.hlsli"
+
+#define VORONOI_MAX_RADIUS 2 //ceil(Sqrt(2))
+#define VORONOI_MAX_NEIGHBOURS 25 //(2 + 1 + 2) * (2 + 1 + 2) for neighbour coverage to satisfy the requirement for Delaunay triangulation - no divergence
+
+#define VORONOI_BASIC_RADIUS 1
+#define VORONOI_BASIC_NEIGHBOURS 9 //Only 9 cells are required for generic voronoi (Moore neighbourhood)
+
+#define DELAUNAY_MAX_VERTICES 10 //The absolute maximum number of vertices that delaunay triangulation can be performed on
+#define DELAUNAY_MAX_TRIS 2 * DELAUNAY_MAX_VERTICES - 5 //Number of triangles is 2n - 5 assuming a triangular convex hull
+#define DELAUNAY_MAX_EDGES 3 * (DELAUNAY_MAX_TRIS)
+#define DELAUNAY_MAX_INDICES 6 * (DELAUNAY_MAX_TRIS) //3 indices per triangle, each edge can be duplicated by an adjacent triangle
+
+namespace Voronoi
+{
+    struct Vertex
+    {
+        float2 pos;
+        float sqrDistance;
+    };
+    
+    //Swaps two vertices
+    void swap(inout Vertex a, inout Vertex b)
+    {
+        Vertex intermediate = a;
+    
+        a = b;
+        b = intermediate;
+    }
+    
+    //Returns all neighbours in the cells of the box radius for a point
+	//Neighbour points are random inside their own cell
+    void getVoronoiNeighbours(inout Vertex neighbourhood[VORONOI_MAX_NEIGHBOURS], inout WorldSpace space, inout TEA baseRNG, float2 position, float2 voronoiOffset, float2 voronoiScale, uint cellRadius)
+    {
+        //Bring world position into voronoi space
+        float2 curCell = position - voronoiOffset;
+        //Get coefficients of voronoi space axes
+        curCell /= voronoiScale;
+
+        //Get the lower left coord
+        {
+            //Get the lower left in parameter space
+            float unused = 0;
+            spatialize(curCell.x, curCell.x, unused);
+            spatialize(curCell.y, curCell.y, unused);
+
+            //In world space it would be...
+            //curCell = voronoiOffset + curCell * voronoiScale;
+            ///...however this can cause seams due to FP error - delay the calculation!
+        }
+
+        //Go through each cell and get the point
+        uint neighbourI = 0;
+        for (int x = -int(cellRadius); x <= int(cellRadius); x++)
+        {
+            for (int z = -int(cellRadius); z <= int(cellRadius); z++)
+            {
+                //Directly calculate the cell coordinate to avoid error
+                float2 thisCell = voronoiOffset + (curCell + float2(x, z)) * voronoiScale;
+
+                Vertex neighbour;
+                
+                //Generate the point in this cell
+                {
+                    //Get the actual point as defined by the world
+                    WorldPoint wPoint = space.getPoint(thisCell);
+
+                    //Fetch generator for this world point
+                    TEA thisRNG = baseRNG;
+                    thisRNG.associate(wPoint.packed);
+
+                    //Get the random UV offset
+                    float2 uvOff;
+                    uvOff.x = thisRNG.getFloat();
+                    thisRNG.stir();
+                    uvOff.y = thisRNG.getFloat();
+
+                    //Convert offset into the position
+                    neighbour.pos = thisCell + uvOff * voronoiScale;
+                }
+
+                //Finally compute the square distance
+                neighbour.sqrDistance = getSquareDistance(neighbour.pos, position);
+
+                //Set neighbour
+                neighbourhood[neighbourI] = neighbour;
+                
+                //Next neighbour
+                neighbourI++;
+            }
+        }
+    }
+    
+    //Returns the index of the single most dominant neighbour (smallest square distance)
+    uint getVoronoiAffinity(inout Vertex neighbourhood[VORONOI_MAX_NEIGHBOURS], uint neighbourCount)
+    {
+        //Simple minimum algorithm
+        uint bestI = 0;
+        float bestVal = neighbourhood[0].sqrDistance;
+
+        for (uint i = 1; i < neighbourCount; i++)
+        {
+            float thisVal = neighbourhood[i].sqrDistance;
+            if (thisVal < bestVal)
+            {
+                bestI = i;
+                bestVal = thisVal;
+            }
+        }
+
+        return bestI;
+    }
+    
+    //The vanilla way to do voronoi
+    Vertex simpleVoronoi(inout WorldSpace space, inout TEA baseRNG, float2 position, float2 voronoiOffset, float2 voronoiScale)
+    {
+        //Get neighbours
+        Vertex neighbours[VORONOI_MAX_NEIGHBOURS];
+        getVoronoiNeighbours(neighbours, space, baseRNG, position, voronoiOffset, voronoiScale, VORONOI_BASIC_RADIUS);
+        
+        //Get the lucky, winning neighbour
+        return neighbours[getVoronoiAffinity(neighbours, VORONOI_BASIC_NEIGHBOURS)];
+    }
+    
+    //Uses the square distance from the three closest voronoi neighbours with weights in order to produce a value
+    float crumpleNoise(inout WorldSpace space, inout TEA baseRNG, float2 position, float2 voronoiOffset, float2 voronoiScale, float3 weights)
+    {
+        //Get neighbours
+        Vertex neighbours[VORONOI_MAX_NEIGHBOURS];
+        getVoronoiNeighbours(neighbours, space, baseRNG, position, voronoiOffset, voronoiScale, VORONOI_BASIC_RADIUS);
+        
+        //Create a square distance value which absolutely cannot be exceeded within this grid
+        //Maximum distance would be 2x the grid diagonals but for error, just choose a large multiplier
+        float worstPossible = 20.0f * dot(voronoiScale, voronoiScale);
+        
+        //Get the three closest points, setting each sqr distance to the impossible value to cull from the search
+        //With each sqr distance, multiply by the designated weight
+        float value;
+        for (uint i = 0; i < 3; i++)
+        {
+            uint closest = getVoronoiAffinity(neighbours, VORONOI_BASIC_NEIGHBOURS);
+            value += neighbours[closest].sqrDistance * weights[i];
+            neighbours[closest].sqrDistance = worstPossible;
+        }
+        
+        return value;
+    }
+    
+    //Returns if the quad is concave (where the edges DON'T intersect). If concave, another bool is set
+	//to indicate if it is a 'rocket' or 'boomerang'
+    bool isConcave(inout bool concaveType, inout Vertex quadrant[4])
+    {
+        //It is concave if the finite diagonal lines don't intersect
+        Line l1;
+        Line l2;
+
+        //Diagonals 0->2, 1->3
+        l1.makeLine(quadrant[0].pos, quadrant[2].pos);
+        l2.makeLine(quadrant[1].pos, quadrant[3].pos);
+
+        //Find the intersection in parameter space
+        float2 interParams;
+        if (!l1.intersectionParams(interParams, l2)) { concaveType = false; return true; }
+
+        //Lines must not intersect in their finite range in order to be concave
+        if (interParams.x < 0 || interParams.x > 1.0f)
+        {
+            //Rocket detected!
+            concaveType = false;
+            return true;
+        }
+
+        if (interParams.y < 0 || interParams.y > 1.0f)
+        {
+            //Boomerang detected!
+            concaveType = true;
+            return true;
+        }
+
+        return false;
+    }
+    
+    //Creates quads out of the neighbours and then returns the quadrant which the position is inside
+    void getQuadrant(inout bool isConcaveQuad, inout Vertex quadrant[4], inout Vertex neighbourhood[VORONOI_MAX_NEIGHBOURS], float2 position)
+    {
+        Vertex midPt = neighbourhood[4];
+
+        //ID of vertices in the Von Neumann neighbourhood
+        uint directionID[4] = { 1, 5, 7, 3 };
+        //ID of diagonals in the Moore neighbourhood
+        uint diagonalID[4] = { 2, 8, 6, 0 };
+
+        //Check each quad to see if the position is inside
+        //If so, figure out the individual triangle and return
+        for (uint i = 0; i < 4; i++)
+        {
+            //Get the two main quad edge points
+            Vertex firstPt = neighbourhood[directionID[i]];
+            Vertex secondPt = neighbourhood[directionID[(i + 1) % 4]];
+            //Get the point on the quad diagonal
+            Vertex diagonal = neighbourhood[diagonalID[i]];
+
+            //Construct the quad
+            quadrant[0] = midPt;
+            quadrant[1] = firstPt;
+            quadrant[2] = diagonal;
+            quadrant[3] = secondPt;
+            
+            //Check if the quad is concave. If so, flip the vertices to remove negative area
+            bool isBoomerang = false;
+
+            isConcaveQuad = isConcave(isBoomerang, quadrant);
+            if (isConcaveQuad)
+            {
+                //Boomerangs are bad!
+                if (isBoomerang)
+                {
+                    //Switch from 0123 -> 1230
+                    quadrant[0] = secondPt;
+                    quadrant[1] = midPt;
+                    quadrant[2] = firstPt;
+                    quadrant[3] = diagonal;
+                }
+            }
+            
+            //Check if the position is in the first half of the quadrant
+            float2 coneParams = Triangle::containment(position, quadrant[0].pos, quadrant[1].pos, quadrant[2].pos);
+            if (Triangle::parameterInside(coneParams))
+            {
+                //This quad is it!
+                return;
+            }
+
+            //Check if the position is in the second half of the quadrant
+            coneParams = Triangle::containment(position, quadrant[2].pos, quadrant[3].pos, quadrant[0].pos);
+            if (Triangle::parameterInside(coneParams))
+            {
+                //This quad is it!
+                //However... it is better if this triangle was at the start of the order so that the information of
+                //which triangle contains the point can be known
+
+                //012, 230 -> 230, 012
+                //Pairs 0+2, 1+3
+                swap(quadrant[0], quadrant[2]);
+                swap(quadrant[1], quadrant[3]);
+
+                return;
+            }
+            
+            //Nope :(
+        }
+        
+        //Should not reach here
+    }
+    
+    //Returns the Delaunay triangle which a point is contained in within a quad. The quad must be convex
+    void getDelaunaySubset(inout Vertex tri[3], inout Vertex quadrant[4], float2 position)
+    {
+        //Two options of triangle pairs
+        //0, 1, 2 and 2, 3, 0 or 3, 0, 1 and 1, 2, 3
+        
+        //Assume the first option
+        //Get both triangles to evaluate
+        float2 pair1[3];
+        pair1[0] = quadrant[0].pos;
+        pair1[1] = quadrant[1].pos;
+        pair1[2] = quadrant[2].pos;
+        float2 pair2[3];
+        pair2[0] = quadrant[2].pos;
+        pair2[1] = quadrant[3].pos;
+        pair2[2] = quadrant[0].pos;
+        
+        //For the default option, both tris must be delaunay tris
+        if (Triangle::isDelaunay(pair1, quadrant[3].pos) && Triangle::isDelaunay(pair2, quadrant[1].pos))
+        {
+            //First option works. Now see which triangle the position is inside and return that
+            float2 params = Triangle::containment(position, pair1[0], pair1[1], pair1[2]);
+            if (Triangle::parameterInside(params))
+            {
+                tri[0] = quadrant[0];
+                tri[1] = quadrant[1];
+                tri[2] = quadrant[2];
+            }
+            else
+            {
+                tri[0] = quadrant[2];
+                tri[1] = quadrant[3];
+                tri[2] = quadrant[0];
+            }
+        }
+        else
+        {
+            //Resort to second option by swapping the edge. Now see which triangle the position is inside and return that
+            float2 params = Triangle::containment(position, quadrant[3].pos, quadrant[0].pos, quadrant[1].pos);
+            if (Triangle::parameterInside(params))
+            {
+                tri[0] = quadrant[3];
+                tri[1] = quadrant[0];
+                tri[2] = quadrant[1];
+            }
+            else
+            {
+                tri[0] = quadrant[1];
+                tri[1] = quadrant[2];
+                tri[2] = quadrant[3];
+            }
+        }
+    }
+    
+    //Hash function for edges (assumed limit is 256 values)
+    uint hashEdge(uint2 values)
+    {
+        //First sort first and second
+        if (values.x > values.y)
+        {
+            //Swap
+            uint intermediate = values.x;
+            values.x = values.y;
+            values.y = intermediate;
+        }
+
+        //Smallest value is the first byte, largest value is the second byte!
+        return values.x | ((values.y & 0xFF) << 8);
+    }
+
+    //Reverses the hash function for edges (assumed limit is 256 values)
+    uint2 unhashEdge(uint hash)
+    {
+        uint2 values;
+        //Smallest value is the first byte
+        values.x = hash & 0xFF;
+        //Larger value is the second byte, simple!
+        values.y = hash >> 8;
+        
+        return values;
+    }
+    
+    //Returns the Delaunay triangle out of a set of vertices that contains a position
+    //Uses the 'area share' [0, 1] to determine if new triangles by a vertex are too small. If so, the vertex itself is culled entirely
+	//Note: there must be a known triangle convex hull included in the set of vertices at the start
+    uint3 getDelaunayTriangle(Vertex verts[DELAUNAY_MAX_VERTICES], uint verticesCount, float areaShare, float sqrAngReq, float2 position)
+    {
+        uint indexes[DELAUNAY_MAX_INDICES];
+
+        //Include the convex hull triangle as the first 'found' triangle
+        uint foundTriangles = 1;
+        indexes[0] = 0;
+        indexes[1] = 1;
+        indexes[2] = 2;
+
+        //If new triangles' area to hull area ratio is below areaShare, cull it!
+        float2 hullTriangle[3] = { verts[0].pos, verts[1].pos, verts[2].pos };
+        float hullArea = Triangle::getArea(hullTriangle);
+        
+        //Now go through each vertice (excluding the hull), checking which triangles it invalidates and adjust the list accordingly
+        //Bowyer-Watson algorithm (optimised for GPU - as in wayyy less efficient but more parallel)
+        [loop]
+        for (uint i = 3; i < verticesCount; i++)
+        {
+            float2 newVertPt = verts[i].pos;
+
+            uint badTriangles[DELAUNAY_MAX_TRIS]; //Indexes of the bad triangles to remove
+            uint badTrianglesCount = 0;
+            
+            uint2 badEdges[DELAUNAY_MAX_EDGES]; //Edge hashes with a counter indicating the bad triangles that include it
+            uint badEdgesCount = 0;
+            
+            //Check each triangle to see if it is invalidated by this point
+            [loop]
+            for (uint tri = 0; tri < foundTriangles; tri++)
+            { 
+                uint triangleStart = tri * 3;
+
+                //Fetch the indices
+                uint iT1 = indexes[triangleStart];
+                uint iT2 = indexes[triangleStart + 1];
+                uint iT3 = indexes[triangleStart + 2];
+
+                float2 testTri[3] = { verts[iT1].pos, verts[iT2].pos, verts[iT3].pos };
+                if (!Triangle::isDelaunay(testTri, newVertPt))
+                {
+                    //Bad triangle! Timeout for you
+                    badTriangles[badTrianglesCount] = triangleStart;
+                    badTrianglesCount++;
+
+                    //Compute the edge hashes
+                    uint eH1 = hashEdge(uint2(iT1, iT2));
+                    uint eH2 = hashEdge(uint2(iT2, iT3));
+                    uint eH3 = hashEdge(uint2(iT3, iT1));
+
+                    //Try to find existing bad edges
+                    [unroll(DELAUNAY_MAX_EDGES)] //The compiler hates this loop, show that it is important for up to the maximum edges
+                    for (uint edI = 0; edI < badEdgesCount; edI++)
+                    {
+                        uint edge = badEdges[edI].x;
+
+                        //Check if an edge hash matches. If so, set it to the convenient invalid hash of null/zero (point cannot be edge with itself)
+                        [flatten]
+                        if (edge == eH1) { eH1 = 0; badEdges[edI].y++; }
+                        [flatten]
+                        if (edge == eH2) { eH2 = 0; badEdges[edI].y++; }
+                        [flatten]
+                        if (edge == eH3) { eH3 = 0; badEdges[edI].y++; }
+                    }
+
+                    //Now append any new bad edges
+                    [flatten]
+                    if (eH1) { badEdges[badEdgesCount] = uint2(eH1, 1); badEdgesCount++; }
+                    [flatten]
+                    if (eH2) { badEdges[badEdgesCount] = uint2(eH2, 1); badEdgesCount++; }
+                    [flatten]
+                    if (eH3) { badEdges[badEdgesCount] = uint2(eH3, 1); badEdgesCount++; }
+                }
+            }
+            
+            //Check if the new triangles that will be generated meet the criteria, if not, cull the vertex
+            bool cullVertex = false;
+            [loop]
+            for (uint badEdgeIC = 0; badEdgeIC < badEdgesCount; badEdgeIC++)
+            {
+                //Skip this edge if it isn't the polygon edge that will be recalculated
+                if (badEdges[badEdgeIC].y > 1)
+                {
+                    continue;
+                }
+
+                //Edge indexes
+                uint2 edgeIndices = unhashEdge(badEdges[badEdgeIC].x);
+
+                //Criteria check: area must be greater than a ratio of the hull
+                float2 myTriangle[3] = { verts[i].pos, verts[edgeIndices.x].pos, verts[edgeIndices.y].pos };
+                float myArea = Triangle::getArea(myTriangle);
+                if (myArea / hullArea < areaShare)
+                {
+                    cullVertex = true;
+                    break;
+                }
+                
+                //Criteria check: cos square angles must all be greater than a predetermined one
+                //Length vectors to use
+                float2 triA = verts[i].pos - verts[edgeIndices.x].pos;
+                float2 triB = verts[i].pos - verts[edgeIndices.y].pos;
+                float2 triC = verts[edgeIndices.x].pos - verts[edgeIndices.y].pos;
+                if (Triangle::getCosSqrAngle(triA, triB) > sqrAngReq || Triangle::getCosSqrAngle(triA, triC) > sqrAngReq || Triangle::getCosSqrAngle(triB, triC) > sqrAngReq)
+                {
+                    cullVertex = true;
+                    break;
+                }
+            }
+
+            //If criteria wasn't met, completely ignore this vertex and all pending changes it would've made
+            if (cullVertex)
+            {
+                continue;
+            }
+
+            //All bad triangles found, overwrite bad triangles with new triangles and append the rest
+            //new triangles will always at least overwrite all bad triangles
+            //New triangles are simply this vertex plus bad edges which won't be erased (edge must only be counted ONCE)
+            uint overwriteProgress = 0;
+            [loop]
+            for (uint badEdgeI = 0; badEdgeI < badEdgesCount; badEdgeI++)
+            {
+                //Skip this edge if it isn't the polygon edge that will be recalculated
+                if (badEdges[badEdgeI].y > 1) { continue; }
+
+                //Figure out if overwriting or appending
+                uint newTriangleIndex = foundTriangles * 3;
+                if (overwriteProgress < badTrianglesCount)
+                {
+                    //Fetch the index of the triangle that will be overwritten
+                    newTriangleIndex = badTriangles[overwriteProgress];
+                    overwriteProgress++;
+                }
+                else
+                {
+                    foundTriangles++;
+                }
+
+                //New triangle starts at the vertice in question and connects to the edge
+                indexes[newTriangleIndex] = i;
+
+                //Edge indexes
+                uint2 edgeIndices = unhashEdge(badEdges[badEdgeI].x);
+
+                indexes[newTriangleIndex + 1] = edgeIndices.x;
+                indexes[newTriangleIndex + 2] = edgeIndices.y;
+            }
+        }
+
+        //The delaunay triangles have been found!
+        //Now figure out which triangle contains this point
+        //Note: this algorithm is inefficient for large sets of vertices as you'd only want to check and construct triangles
+        //local to the point in question however, since this specific implementation is designed for a small set, this is better
+        [flatten]
+        for (uint trI = 0; trI < foundTriangles; trI++)
+        {
+            //Construct this triangle
+            uint triIndexStart = trI * 3;
+
+            uint indice1 = indexes[triIndexStart];
+            uint indice2 = indexes[triIndexStart + 1];
+            uint indice3 = indexes[triIndexStart + 2];
+
+            //Calculate the params of the position in triangle space
+            float2 triangleParams = Triangle::containment(position, verts[indice1].pos, verts[indice2].pos, verts[indice3].pos);
+            //If this vertice is inside this triangle, return this triangle and the algorithm ends
+            if (Triangle::parameterInside(triangleParams))
+            {
+                return uint3(indice1, indice2, indice3);
+            }
+        }
+
+        //If this algorithm is somehow given wrong data or fails, return the convex hull
+        return uint3(0, 1, 2);
+    }
+    
+    //Subdivides a triangle that a position is already inside into smaller, logical triangles and returns which sub triangle the position is inside
+	//If no vertices were generated, false is returned and the triangle returned is the hull
+	//The RNG is branched depending on the triangle found so that the next random numbers will be unique to the repective triangle
+    bool triangleDelaunayDensitySubdivide(inout Vertex hull[3], inout WorldSpace space, inout TEA rng, float2 position, float probabilityVertice, uint maxVertices, float areaShare, float sqrAngReq)
+    {
+        Vertex vertices[DELAUNAY_MAX_VERTICES];
+        uint vertexCount = 3;
+        
+        //Start with the convex hull triangle which MUST be in 0, 1, 2
+        vertices[0] = hull[0];
+        vertices[1] = hull[1];
+        vertices[2] = hull[2];
+        
+        [loop]
+        for (uint i = 0; i < maxVertices; i++)
+        {
+            //See if there should be a vertex generated
+            rng.stir();
+            float cull = rng.getFloat();
+
+            //The value generated must be less than the probability value
+            if (cull >= probabilityVertice)
+            {
+                break;
+            }
+
+            //Success! Generate the point in triangle space
+            float2 triCoords;
+            rng.stir();
+            triCoords.x = rng.getFloat();
+            rng.stir();
+            triCoords.y = triCoords.x * rng.getFloat(); //y axis is constrained by x
+
+            Vertex newVert;
+            //Now calculate the real position of the point
+            newVert.pos = Triangle::paramsToCoord(triCoords, hull[0].pos, hull[1].pos, hull[2].pos);
+            //Calculate the square distance from the position
+            newVert.sqrDistance = getSquareDistance(newVert.pos, position);
+
+            //Append this new vertex
+            vertices[vertexCount] = newVert;
+            vertexCount++;
+        }
+
+        //If no vertices were generated, return instantly
+        if (vertexCount <= 3) { return false; }
+        
+        //Find delaunay triangles and get the one the position is in
+        uint3 newTriangle = getDelaunayTriangle(vertices, vertexCount, areaShare, sqrAngReq, position);
+        
+        //Set the triangle using the indices
+        hull[0] = vertices[newTriangle.x];
+        hull[1] = vertices[newTriangle.y];
+        hull[2] = vertices[newTriangle.z];
+
+        //Branch RNG for this new triangle
+        rng = branchRNG(rng);
+        
+        //Associate the RNG with this triangle
+        {
+            //Clever way to do it is to assume all vertices are in a consistent order
+            //The algorithm evaluates in the same way for the same input, so the output indices can directly be used
+            //to seed the rng
+            uint assoc1 = hashEdge(uint2(newTriangle[0], newTriangle[1]));
+            uint assoc2 = hashEdge(uint2(newTriangle[1], newTriangle[2]));
+
+            rng.associate(uint2(assoc1, assoc2));
+        }
+        
+        //A new triangle was generated
+        return true;
+    }
+    
+    //Returns the logical, generated triangle in the world that contains a point
+	//Subdivides the space recursively for somewhat random density
+	//The probability of new points in a triangle at a given 'depth' exponentially decreases
+    void getVoronoiTriangle(inout Vertex tri[3], inout WorldSpace space, inout TEA baseRNG, float2 position, float2 voronoiOffset, float2 voronoiScale, uint maxSubDivisions, uint maxSubPoints, float startPointProbability, float probabilityDepthRatio, float areaShare, float sqrAngReq)
+    {
+        //--MACRO SCALE--
+        //Get the relevant voronoi points around the position in the grid
+        Vertex neighbours[VORONOI_MAX_NEIGHBOURS];
+        getVoronoiNeighbours(neighbours, space, baseRNG, position, voronoiOffset, voronoiScale, 1);
+
+        //Now connect the points and fetch the quad that the position is in
+        Vertex quadrant[4];
+        bool quadConcave = false;
+        getQuadrant(quadConcave, quadrant, neighbours, position);
+
+        //Get the triangle the position is in inside the quad which maximises the quad triangle angles (to appear nice)
+        //...if it is concave, this isn't possible and so the triangle which the position is in can immediately be used
+        if (quadConcave)
+        {
+            tri[0] = quadrant[0];
+            tri[1] = quadrant[1];
+            tri[2] = quadrant[2];
+        }
+        else
+        {
+            getDelaunaySubset(tri, quadrant, position);
+        }
+        //--END OF MACRO SCALE--
+
+        
+        //New branch for the macro triangle
+        TEA rng = baseRNG;
+        rng = branchRNG(rng);
+
+        //Up until this point, the vertices have been in an arbitrary order - which makes it impossible to get consistent results based on geometry alone!
+        //The solution is to rearrange the vertices of the triangle in a way which would be globally consistent!
+        {
+            //Lets sort vertices by their x axis position. This will break where they are equal but the chance of that is small enough that the efficiency is worth it!
+            //Sort by the smallest x value in ascending indice order
+
+            //Push the largest value to the right
+            if (tri[1].pos.x < tri[0].pos.x) { swap(tri[0], tri[1]); }
+            if (tri[2].pos.x < tri[1].pos.x) { swap(tri[1], tri[2]); }
+
+            //Finally sort the to small values
+            if (tri[1].pos.x < tri[0].pos.x) { swap(tri[0], tri[1]); }
+        }
+        
+        //Triangle is consistent but now a triangle dependent RNG is required
+        //Vertices cannot be used since vertices are shared between triangles
+        //Simplest solution is to use a point inside the triangle - since triangles can't overlap
+        //and since the vertices are sorted, floating point error will be consistent too!
+        {
+            //Average points to get somewhere inside
+            float2 areaPoint = tri[0].pos + tri[1].pos + tri[2].pos;
+            areaPoint /= 3.0f;
+
+            //Now get this point in world space
+            WorldPoint worldPt = space.getPoint(areaPoint);
+
+            //Use this to seed random
+            rng.associate(worldPt.packed);
+        }
+        
+        //--RECURSIVE SUBDIVIDE--
+        [loop]
+        for (uint depth = 0; depth < maxSubDivisions; depth++)
+        {
+            //Subdivide the triangle, stop going deeper if the function terminates early
+            if (!triangleDelaunayDensitySubdivide(tri, space, rng, position, startPointProbability, maxSubPoints, areaShare, sqrAngReq))
+            {
+                break;
+            }
+
+            //The probability of new points at the next depth is scaled by the ratio
+            startPointProbability *= probabilityDepthRatio;
+        }
+        //--END OF RECURSIVE SUBDIVIDE--
+
+        //Phew... triangle found!
+    }
+    
+    //Uses a voronoi diagram to incrementally fault by an offset 
+    float fault(inout WorldSpace space, TEA baseRNG, float2 position, float2 maxVoronoiScale, uint maxFaults, float faultDetailBias)
+    {
+        //Add normalized fault magnitudes, 
+        float faultValue = 0;
+        for (uint i = 0; i < maxFaults; i++)
+        {
+            TEA voronoiRNG = branchRNG(baseRNG);
+            TEA faultRNG = branchRNG(baseRNG);
+            
+            //Coefficient representing the current linear scale, calculated directly to avoid precision error
+            float divisor = float(maxFaults - i) / float(maxFaults); 
+            
+            //Grid scale linearly decreases
+            float2 thisScale = maxVoronoiScale * divisor;
+            
+            //Get neighbourhood
+            Vertex neighbours[VORONOI_MAX_NEIGHBOURS];
+            getVoronoiNeighbours(neighbours, space, voronoiRNG, position, generate2Ranged(voronoiRNG, thisScale), thisScale, VORONOI_BASIC_RADIUS);
+        
+            //Get the winning neighbour
+            uint pointWin = getVoronoiAffinity(neighbours, VORONOI_BASIC_NEIGHBOURS);
+            
+            //Get the world point of the neighbour to then get a random value
+            WorldPoint voronoiCentreWorldPoint = space.getPoint(neighbours[pointWin].pos);
+            faultRNG.associate(voronoiCentreWorldPoint.packed);
+            
+            //Random normalized offset
+            faultRNG.stir();
+            float offset = faultRNG.getNormFloat();
+            
+            //Scale linearly
+            offset *= divisor;
+            
+            //Scale exponentially using an arbitrary 'detail' constant which distinguishes surfaces like marble and chalk from rock
+            //It places more emphasis on large gaps, giving a more 'artificial' appearance
+            offset *= pow(divisor, 1.0f / faultDetailBias);
+            
+            faultValue += offset;
+        }
+        
+        //Now approximately rescale the fault value to a normalized range
+        //Sum of linear values (only!) equals a triangle of discrete values
+        //Converting the triangle into fixed blocks, there are the same number of blocks as the nth triangular number
+        float detectedScale = float(Triangle::getTriangularNumber(maxFaults)) / float(maxFaults);
+        
+        return faultValue / detectedScale;
+    }
+
+}
+
+#define VORONOI_H
+#endif

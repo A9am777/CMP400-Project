@@ -1,0 +1,36 @@
+#ifndef MESHCOMMON_H
+#define MESHCOMMON_H
+
+#include "Globals.lib"
+
+struct CameraBuffer
+{
+  matrix worldMatrix;
+  matrix viewMatrix;
+  matrix projectionMatrix;
+  matrix inverseProjectionMatrix;
+  matrix inverseViewProjectionMatrix;
+};
+
+struct VertexInputType
+{
+  float4 position : POSITION;
+  float2 uv : TEXCOORD0;
+  float3 normal : NORMAL;
+};
+
+struct PixelInputType
+{
+  float4 position : SV_POSITION;
+  float4 screenPosition : POSITION0; //Actually normalised dev coords
+  float2 uv : TEXCOORD0;
+  float3 normal : NORMAL;
+  float3 worldPosition : POSITION1;
+};
+
+struct SimpleColourOutput
+{
+  float4 colour : SV_Target0;
+};
+
+#endif

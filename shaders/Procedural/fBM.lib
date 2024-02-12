@@ -1,0 +1,196 @@
+#ifndef FBM_H
+
+#include "Perlin.lib"
+
+//Fractional brownian motion, a fractal-like application of perlin noise
+class fBM
+{
+    float fracIncr; //Fractal increment
+    float fracGap; //Fractal gap
+    float octaves; //Number of frequencies/applications of perlin noise
+    float padding;
+    
+    //Returns the maximum possible value of this fBM
+    float maxValue()
+    {
+        //Assuming each perlin octave returns 1
+        //The maximum value is the sum of the weights
+        float max = 0;
+        
+        uint cOctaves = uint(trunc(octaves)); //Count of non-remainder octaves
+        for (uint i = 0; i < cOctaves; i++)
+        {
+            //Calculate the frequency and in turn the weight coefficient
+            float frequency = pow(fracGap, float(i));
+            float weight = pow(frequency, -fracIncr);
+            
+            max += weight;
+        }
+        
+        //Now add one final octave weight, scaled for the remainder
+	    {
+            float octaveRemainder = octaves - float(cOctaves); //Coefficient of remainder
+            
+            //Calculate the frequency and in turn the weight coefficient
+            float frequency = pow(fracGap, float(cOctaves));
+            float weight = pow(frequency, -fracIncr);
+            
+            max += weight * octaveRemainder;
+        }
+        
+        return max;
+    }
+    
+  float fBMNoise(inout WorldSpace space, inout TEA baseRNG, float3 position, float3 absoluteOffset, float3 absoluteScale)
+  {
+    float value = 0;
+
+    uint cOctaves = uint(trunc(octaves)); //Count of non-remainder octaves
+        
+	  //Per significant octave
+    [loop] //Don't unroll - octaves should be locally similar so an early exit is prefered if possible
+    for (uint i = 0; i < cOctaves; i++)
+    {
+      //Branch a generator for this octave
+      TEA octGen = branchRNG(baseRNG);
+            
+      //Calculate the frequency and in turn the weight coefficient
+      float frequency = pow(fracGap, float(i));
+      float weight = pow(frequency, -fracIncr);
+            
+		  //Get the section of this octave of perlin noise
+      float3 uvw = position;
+      Perlin::Section3D section = Perlin::getSection(space, octGen, uvw, absoluteOffset, absoluteScale);
+		
+		  //Add the weighted value of this octave of noise to the total
+      value += Perlin::perlinNoise(section, uvw) * weight;
+            
+		  //Shift the scale for the next octave
+      absoluteScale /= fracGap;
+    }
+
+	    //Now add one final octave, scaled for the remainder
+    {
+      float octaveRemainder = octaves - float(cOctaves); //Coefficient of remainder
+
+      //Branch a generator for this octave
+      TEA octGen = branchRNG(baseRNG);
+            
+      //Calculate the frequency and in turn the weight coefficient
+      float frequency = pow(fracGap, float(cOctaves));
+      float weight = pow(frequency, -fracIncr);
+            
+      //Get the section of this octave of perlin noise
+      float3 uvw = position;
+      Perlin::Section3D section = Perlin::getSection(space, octGen, uvw, absoluteOffset, absoluteScale);
+
+            //Add the weighted value of this remainder octave of noise to the total
+      value += octaveRemainder * Perlin::perlinNoise(section, uvw) * weight;   
+    }
+
+    return value;
+  }
+  
+    float fBMNoise(inout WorldSpace space, inout TEA baseRNG, inout float2 tangentPDerives, float2 position, float2 absoluteOffset, float2 absoluteScale)
+    {
+        float value = 0;
+        tangentPDerives = float2(0, 0);
+
+        uint cOctaves = uint(trunc(octaves)); //Count of non-remainder octaves
+        
+	    //Per significant octave
+        [loop] //Don't unroll - octaves should be locally similar so an early exit is prefered if possible
+        for (uint i = 0; i < cOctaves; i++)
+        {
+            //Branch a generator for this octave
+            TEA octGen = branchRNG(baseRNG);
+            
+            //Calculate the frequency and in turn the weight coefficient
+            float frequency = pow(fracGap, float(i));
+            float weight = pow(frequency, -fracIncr);
+            
+		    //Get the section of this octave of perlin noise
+            float2 uv = position;
+            Perlin::Section section = Perlin::getSection(space, octGen, uv, absoluteOffset, absoluteScale);
+		
+		    //Add the weighted value of this octave of noise to the total
+            value += Perlin::perlinNoise(section, uv) * weight;
+            
+            //Calculate the tangent partial derivatives and add to the total
+            //Perlin = f(position / absoluteScale) * weight
+            //by the chain rule, Perlin' = f'(uv) * weight / absoluteScale
+            float2 tangentVals = Perlin::perlinNoiseDerivatives(section, uv); //Get the derivative of the function
+            tangentVals *= weight / absoluteScale; //Multiply by the derivative of the function of position
+            tangentPDerives += tangentVals;
+            
+		    //Shift the scale for the next octave
+            absoluteScale /= fracGap;
+        }
+
+	    //Now add one final octave, scaled for the remainder
+	    {
+            float octaveRemainder = octaves - float(cOctaves); //Coefficient of remainder
+
+            //Branch a generator for this octave
+            TEA octGen = branchRNG(baseRNG);
+            
+            //Calculate the frequency and in turn the weight coefficient
+            float frequency = pow(fracGap, float(cOctaves));
+            float weight = pow(frequency, -fracIncr);
+            
+            //Get the section of this octave of perlin noise
+            float2 uv = position;
+            Perlin::Section section = Perlin::getSection(space, octGen, uv, absoluteOffset, absoluteScale);
+
+            //Add the weighted value of this remainder octave of noise to the total
+            value += octaveRemainder * Perlin::perlinNoise(section, uv) * weight;
+            
+            //Calculate the tangent partial derivatives and add to the total
+            //Perlin = f(position / absoluteScale) * octaveRemainder * weight
+            //by the chain rule, Perlin' = f'(uv) * octaveRemainder * weight / absoluteScale
+            float2 tangentVals = Perlin::perlinNoiseDerivatives(section, uv); //Get the derivative of the function
+            tangentVals *= octaveRemainder * weight / absoluteScale; //Multiply by the derivative of the function of position
+            tangentPDerives += tangentVals;
+        }
+
+        return value;
+    }
+    
+    //Calculate the noise without using the tangents
+    float fBMNoise(inout WorldSpace space, inout TEA baseRNG, float2 position, float2 absoluteOffset, float2 absoluteScale)
+    {
+        float2 unusedTangents;
+        return fBMNoise(space, baseRNG, unusedTangents, position, absoluteOffset, absoluteScale);
+    }
+    
+    //Uses two fBM noise grids to calculate a value offset to distort by
+    float2 perturbationNoise(inout WorldSpace space, inout TEA baseRNG, inout float2x2 tangentPDerives, float2 position, float2 absoluteOffset, float2 absoluteScale)
+    {
+        //Generate the offset of the second grid
+        float2 secondOffset = generate2Ranged(baseRNG, absoluteScale);
+        
+        //Two separate generators, one per axis
+        TEA firstRNG = branchRNG(baseRNG);
+        TEA secondRNG = branchRNG(baseRNG);
+        
+        float2 result;
+        
+        //First axis fBM noise
+        result.x = fBMNoise(space, firstRNG, tangentPDerives._m00_m01, position, absoluteOffset, absoluteScale);
+        
+        //Second axis fBM noise
+        result.y = fBMNoise(space, secondRNG, tangentPDerives._m10_m11, position, absoluteOffset + secondOffset, absoluteScale);
+        
+        return result;
+    }
+    
+    //Calculate the perturbation noise without using the tangents
+    float2 perturbationNoise(inout WorldSpace space, inout TEA baseRNG, float2 position, float2 absoluteOffset, float2 absoluteScale)
+    {
+        float2x2 nullTan = float2x2(0, 0, 0, 0);
+        return perturbationNoise(space, baseRNG, nullTan, position, absoluteOffset, absoluteScale);
+    }
+};
+
+#define FBM_H
+#endif

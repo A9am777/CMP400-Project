@@ -1,0 +1,82 @@
+#ifndef WORLD_H
+
+#include "TEA.lib"
+
+struct WorldPoint
+{
+    float2 position; //Classical coordinate
+    uint2 packed; //Coordinate in referenceable space
+};
+
+struct WorldPoint3D
+{
+  float3 position; // Classical coordinate
+  uint2 packed; // Coordinate in referenceable space
+};
+
+class WorldSpace
+{
+    float3 worldMax; //World is between origin and this point
+    float epsilon; //Float representing the smallest fractional unit
+    uint fractionBits; //Number of bits dedicated to representing a fraction in the range [0, 1]
+    
+    //Loop a value into [0, max] range
+    float toRange(float value, float max)
+    {
+        if (value < 0)
+        {
+            return max - fmod(-value, max); //Fold over and loop in -ve direction
+        }
+	
+        return fmod(value, max); //Loop in +ve direction
+    }
+    
+    //Convert a +ve value into referenceable space
+    uint packValue(float value)
+    {
+        uint big = 0;
+        float fraction = modf(value, big); //Fetch fraction value and major value
+        uint smallComponent = trunc(fraction / epsilon); //How many epsilon fit into the fraction
+
+        return (big << fractionBits) | smallComponent;
+    }
+    
+    WorldPoint getPoint(float2 arbitrary)
+    {
+        WorldPoint wPoint;
+        //Bring into world coordinates
+        wPoint.position.x = toRange(arbitrary.x, worldMax.x);
+        wPoint.position.y = toRange(arbitrary.y, worldMax.y);
+	    
+        //Now pack
+        wPoint.packed.x = packValue(wPoint.position.x);
+        wPoint.packed.y = packValue(wPoint.position.y);
+
+        return wPoint;
+    }
+  
+  WorldPoint3D getPoint(float3 arbitrary)
+  {
+    WorldPoint3D wPoint;
+    // Bring into world coordinates
+    wPoint.position.x = toRange(arbitrary.x, worldMax.x);
+    wPoint.position.y = toRange(arbitrary.y, worldMax.y);
+    wPoint.position.z = toRange(arbitrary.z, worldMax.z);
+	    
+    //Now pack
+    wPoint.packed.x = (packValue(wPoint.position.x) & 0xFFFF) | (packValue(wPoint.position.y) << 16);
+    wPoint.packed.y = packValue(wPoint.position.z);
+
+    return wPoint;
+  }
+};
+
+//Converts a value in unit space into a big component representing 'left' and a small component [0, 1] of distance right
+void spatialize(float value, inout float bigVal, inout float smallVal)
+{
+    bigVal = floor(value); //Always rounds in the -ve direction
+    smallVal = value - bigVal; //Left -> right = right - left
+}
+
+#define WORLD_H
+#endif

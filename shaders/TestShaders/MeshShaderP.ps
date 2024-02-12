@@ -1,0 +1,22 @@
+#include "../Utility/MeshCommon.lib"
+#include "../Lighting/LightStructs.lib"
+
+cbuffer LightSlot : register(b0)
+{
+  DirectionalLight light;
+}
+
+float halfLambert(float intensity)
+{
+  return pow(intensity * .5 + .5, 2.);
+}
+
+SimpleColourOutput main(PixelInputType input)
+{
+  SimpleColourOutput output;
+    
+  float3 diffuse = input.normal * .5 + float3(.5, .5, .5);
+  output.colour = float4(diffuse * light.diffuse * saturate(halfLambert(dot(input.normal, -light.direction.xyz))), 1.);
+    
+  return output;
+}

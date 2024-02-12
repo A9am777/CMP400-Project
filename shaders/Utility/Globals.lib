@@ -1,0 +1,7 @@
+#ifndef GLOBALS_H
+#define GLOBALS_H
+
+// Remove the need to transpose
+#pragma pack_matrix( row_major )
+
+#endif
