@@ -19,12 +19,23 @@ namespace Haboob
     gbuffer.getGamma() = .2f;
     gbuffer.getExposure() = 1.3f;
     dirLightPack.diffuse = { 3.96f, 3.92f, 3.14f };
+    dirLightPack.ambient = { 0.96f, 0.92f, 0.14f };
     dirLightPack.direction = { -1.f, .25f, .0f, 1.f };
 
     // Raymarch params
-    raymarchShader.getOpticsInfo().attenuationFactor = 1.54f;
-    raymarchShader.getOpticsInfo().colourHGScatter = { .735f, .732f, .651f };
-    raymarchShader.getOpticsInfo().densityCoefficient = 170.f;
+    {
+      auto& opticsInfo = raymarchShader.getOpticsInfo();
+
+      opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
+      opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
+      opticsInfo.phaseBlendWeightTerms = { .09f, .09f, .09f, .09f, };
+      opticsInfo.scatterAngstromExponent = 3.1f;
+
+      opticsInfo.absorptionAngstromExponent = 2.1f;
+      opticsInfo.powderCoefficient = .1f;
+      opticsInfo.attenuationFactor = 21.1f;
+    }
+
     raymarchShader.getMarchInfo().iterations = 26;
 
     // Produce standalone shaders
@@ -384,6 +395,7 @@ namespace Haboob
       {
         ImGui::DragFloat3("Light direction", &dirLightPack.direction.x);
         ImGui::DragFloat3("Light colour", &dirLightPack.diffuse.x);
+        ImGui::DragFloat3("Light ambient", &dirLightPack.ambient.x);
         ImGui::DragFloat("Gamma", &gbuffer.getGamma());
         ImGui::DragFloat("Exposure", &gbuffer.getExposure());
       }
@@ -425,11 +437,23 @@ namespace Haboob
       if (ImGui::CollapsingHeader("Optics"))
       {
         auto& opticsInfo = raymarchShader.getOpticsInfo();
-        ImGui::DragFloat3("Henyey-Greenstein phase coefficients", &opticsInfo.colourHGScatter.x, .01f, .0f, 1.f);
-        ImGui::DragFloat("Beer attenuation factor", &opticsInfo.attenuationFactor);
-        ImGui::DragFloat("Density Coefficient", &opticsInfo.densityCoefficient);
+        
+        ImGui::Text("Phase");
+        ImGui::DragFloat4("Henyey-Greenstein anisotropy (f)", &opticsInfo.anisotropicForwardTerms.x);
+        ImGui::DragFloat4("Henyey-Greenstein anisotropy (b)", &opticsInfo.anisotropicBackwardTerms.x);
+        ImGui::DragFloat4("Phase blend", &opticsInfo.phaseBlendWeightTerms.x);
+        ImGui::DragFloat("Scattering angstrom exponent", &opticsInfo.scatterAngstromExponent);
+        
+        ImGui::Text("Transmission");
+        ImGui::DragFloat("Absorption angstrom exponent", &opticsInfo.absorptionAngstromExponent);
+        ImGui::DragFloat("Beers Powder coefficient", &opticsInfo.powderCoefficient);
+        ImGui::DragFloat("Attenuation scale", &opticsInfo.attenuationFactor);
+        ImGui::DragFloat("Attenuation efEeEe", &opticsInfo.referenceWavelength);
+        
+        ImGui::Text("Flags");
         ImGui::CheckboxFlags("Apply beer", &opticsInfo.flagApplyBeer, ~0);
         ImGui::CheckboxFlags("Apply HG", &opticsInfo.flagApplyHG, ~0);
+        ImGui::CheckboxFlags("Apply Spectral", &opticsInfo.flagApplySpectral, ~0);
       }
     }
     ImGui::End();

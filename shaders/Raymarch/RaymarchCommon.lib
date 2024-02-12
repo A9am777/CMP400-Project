@@ -17,13 +17,21 @@ struct MarchVolumeDispatchInfo
 
 struct BasicOptics
 {
-  float attenuationFactor; // Scales optical depth
-  float3 colourHGScatter; // Per component light scattering for the HG phase function
+  float4 anisotropicForwardTerms; // Forward anisotropic parameters per major light component
+  float4 anisotropicBackwardTerms; // Backward anisotropic parameters per major light component
+  float4 phaseBlendWeightTerms; // Per component phase blend factor
   
-  float densityCoefficient; // Scaling factor of density
+  float scatterAngstromExponent;
+  float absorptionAngstromExponent;
+  float attenuationFactor; // Scales optical depth
+  float powderCoefficient; // Beers-Powder scaling factor
+  float4x4 spectralWavelengths; // Wavelengths to integrate over
+  float4x4 spectralWeights; // Spectral integration weights
+  
   uint flagApplyBeer; // Controls whether to apply Beer-Lambert attenuation
   uint flagApplyHG; // Controls whether to apply the HG phase function
-  uint padding;
+  uint flagApplySpectral; // Controls whether to integrate over several wavelengths
+  float referenceWavelength;
 };
 
 struct MarchParams
@@ -53,17 +61,61 @@ struct Cube
   float3 size;
 };
 
-struct Integrator // Simpsons rule
+struct RectangleIntegrator // Midpoint rule
+{
+  float total;
+  uint count;
+};
+
+struct SimpsonsIntegrator // Simpsons rule
 {
   float firstTerm;
   float lastTerm;
   float odds;
   float evens;
+  uint count;
 };
 
 static float PI = radians(180.);
 
 // The depth to find the ray 'end' at
 #define ZDirectionTest .01
+
+
+void append(inout SimpsonsIntegrator inte, float value)
+{
+  inte.lastTerm = value;
+  if (inte.count % 2 == 0)
+  {
+    inte.evens += value;
+  }
+  else
+  {
+    inte.odds += value;
+  }
   
+  inte.count++;
+}
+
+float integrate(inout SimpsonsIntegrator inte)
+{
+  // Note: sample count must always be even
+  float stepSize = 1. / float(inte.count);
+  float result = inte.firstTerm + inte.lastTerm;
+  result += 4. * inte.odds;
+  result += 2 * (inte.evens - inte.lastTerm);
+  return result * stepSize / 3.;
+}
+
+void append(inout RectangleIntegrator inte, float value)
+{
+  inte.total += value;
+  inte.count++;
+}
+
+float integrate(inout RectangleIntegrator inte)
+{
+  return inte.total;
+}
+
 #endif
