@@ -116,7 +116,7 @@ namespace Haboob
       return (abscissas - distributionCoefficients[3]) / distributionCoefficients[2];
     };
     auto logWeight = [](float abscissas, float distributionCoefficients[4]) -> float {
-      return exp(abscissas / distributionCoefficients[1]) / (distributionCoefficients[1] * distributionCoefficients[2]);
+      return abs(exp(abscissas / distributionCoefficients[1]) / (distributionCoefficients[1] * distributionCoefficients[2])); //TODO: why the abs???
     };
     auto linearWeight = [](float abscissas, float distributionCoefficients[4]) -> float {
       return 1.f / distributionCoefficients[2];
