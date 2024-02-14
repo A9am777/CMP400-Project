@@ -5,7 +5,7 @@
   #define APPLY_BEER 1
   #define APPLY_HG 1
   #define APPLY_SPECTRAL 1
-  #define MARCH_STEP_COUNT 10
+  #define MARCH_STEP_COUNT 24
 #endif
 
 RWTexture2D<float4> screenOut : register(u0);
@@ -231,7 +231,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   Integrator irradianceInteZ = { 0, 0, 0, 0, 0 };
   Integrator irradianceInteX2 = { 0, 0, 0, 0, 0 };
   
-  // WTF?
+  // TODO: WTF?
   // for(uint i = 0; i < MARCH_STEP_COUNT; ++i)
   
   [loop] // Yeah need to consider this impact

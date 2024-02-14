@@ -18,6 +18,10 @@ startProj(Haboobo)
 
   target_compile_features(Haboobo PUBLIC cxx_std_17)
   target_link_libraries(Haboobo WSTRCore ImGui)
+  
+  # Testing
+  include(${CMAKE_CURRENT_LIST_DIR}/scripts/TestCases.cmake)
+
 endProj(Haboobo)
 
 setMain(Haboobo)
