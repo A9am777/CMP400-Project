@@ -67,7 +67,7 @@ namespace Haboob
     VolumeGenerationShader();
     ~VolumeGenerationShader();
 
-    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     HRESULT rebuild(ID3D11Device* device); // Creates texture from params
     void render(ID3D11DeviceContext* context); // Renders to the texture according to specifications
 
@@ -96,7 +96,7 @@ namespace Haboob
     RaymarchVolumeShader();
     ~RaymarchVolumeShader();
 
-    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource);
     void unbindShader(ID3D11DeviceContext* context);
 

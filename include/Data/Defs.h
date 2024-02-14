@@ -14,4 +14,12 @@ typedef unsigned char Byte;
 typedef unsigned int UInt;
 typedef unsigned long ULong;
 
+// C-style strings
+typedef const char* CString;
+typedef const wchar_t* WCString;
+typedef const char* CStringC;
+typedef const wchar_t* WCStringC;
+typedef const char* Literal; // Program space
+typedef const wchar_t* WLiteral;
+
 #endif

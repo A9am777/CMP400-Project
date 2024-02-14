@@ -39,8 +39,8 @@ namespace Haboob
     raymarchShader.getMarchInfo().iterations = 26;
 
     // Produce standalone shaders
-    deferredVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV");
-    deferredPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP");
+    deferredVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV", true);
+    deferredPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP", true);
   }
   HaboobWindow::~HaboobWindow()
   {
@@ -71,6 +71,8 @@ namespace Haboob
         GBuffer::toneMapShader.initShader(dev, &shaderManager);
         GBuffer::lightShader.initShader(dev, &shaderManager);
       }
+
+      shaderManager.bakeMacros(dev);
       
       // Generate assets
       {

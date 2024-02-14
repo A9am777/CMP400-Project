@@ -6,7 +6,7 @@
 #include <imgui.h>
 #include "Rendering/D3DCore.h"
 #include "Rendering/DisplayDevice.h"
-#include "Rendering/Shaders/Shader.h"
+#include "Rendering/Shaders/ShaderManager.h"
 #include "Rendering/Geometry/SimpleMeshes.h"
 #include "Rendering/Scene/FreeCam.h"
 #include "Rendering/Lighting/LightStructs.h"

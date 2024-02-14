@@ -1,3 +1,4 @@
+#include "Rendering/Shaders/ShaderManager.h"
 #include "Rendering/Textures/GBuffer.h"
 
 namespace Haboob
@@ -93,7 +94,7 @@ namespace Haboob
     litColourTarget.renderFrom(context);
   }
 
-  HRESULT ToneMapShader::initShader(ID3D11Device* device, const ShaderManager* manager)
+  HRESULT ToneMapShader::initShader(ID3D11Device* device, ShaderManager* manager)
   {
     HRESULT result = S_OK;
     

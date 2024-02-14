@@ -9,7 +9,7 @@ namespace Haboob
     public:
     ToneMapShader() : Shader(Shader::Type::Compute, L"Lighting/ToneMap") {}
 
-    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context, ID3D11UnorderedAccessView* uav);
     void bindShader(ID3D11DeviceContext* context) = delete;
     void unbindShader(ID3D11DeviceContext* context);
