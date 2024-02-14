@@ -24,6 +24,8 @@ namespace Haboob
     void addShader(Shader* shader);
     void removeShader(Shader* shader);
 
+    void setMacro(const std::string& name, const std::string& value);
+
     void setVertexLayout(const std::vector<D3D11_INPUT_ELEMENT_DESC>& layout);
     void setRootDir(const std::wstring& root);
     void setShaderDir(const std::wstring& shaders);

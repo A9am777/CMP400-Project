@@ -40,14 +40,25 @@ namespace Haboob
 
   void ShaderManager::addShader(Shader* shader)
   {
-    isMacrosBaked = false; // Hack
-
-    shaders.insert(shader);
+    if (shaders.insert(shader).second)
+    {
+      isMacrosBaked = false; // Hack
+    }
   }
 
   void ShaderManager::removeShader(Shader* shader)
   {
     shaders.erase(shader);
+  }
+
+  void ShaderManager::setMacro(const std::string& name, const std::string& value)
+  {
+    auto macroIt = macroList.find(name);
+    if (macroIt == macroList.end() || macroIt->second != value)
+    {
+      macroList.insert_or_assign(name, value);
+      isMacrosBaked = false;
+    }
   }
 
   void ShaderManager::setVertexLayout(const std::vector<D3D11_INPUT_ELEMENT_DESC>& layout)
