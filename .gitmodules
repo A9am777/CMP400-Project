@@ -10,3 +10,6 @@
 [submodule "externals/catch2"]
 	path = externals/catch2
 	url = https://github.com/catchorg/Catch2.git
+[submodule "externals/args"]
+	path = externals/args
+	url = https://github.com/Taywee/args.git

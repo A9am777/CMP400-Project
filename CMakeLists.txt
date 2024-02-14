@@ -17,10 +17,14 @@ startProj(Haboobo)
   defineShaders(Haboobo ${HLSL_TYPE_HEADER} "${Shaders_HLSLI}" 1)
 
   target_compile_features(Haboobo PUBLIC cxx_std_17)
-  target_link_libraries(Haboobo WSTRCore ImGui)
+  target_link_libraries(Haboobo WSTRCore ImGui Catch2::Catch2 args)
   
   # Testing
   include(${CMAKE_CURRENT_LIST_DIR}/scripts/TestCases.cmake)
+
+  # Scripts
+  include(${CMAKE_CURRENT_LIST_DIR}/scripts/ExportScripts.cmake)
+  exportScripts(Haboobo)
 
 endProj(Haboobo)
 
