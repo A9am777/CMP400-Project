@@ -28,10 +28,8 @@ struct BasicOptics
   float4x4 spectralWavelengths; // Wavelengths to integrate over
   float4x4 spectralWeights; // Spectral integration weights
   
-  uint flagApplyBeer; // Controls whether to apply Beer-Lambert attenuation
-  uint flagApplyHG; // Controls whether to apply the HG phase function
-  uint flagApplySpectral; // Controls whether to integrate over several wavelengths
   float referenceWavelength;
+  uint3 padding;
 };
 
 struct MarchParams

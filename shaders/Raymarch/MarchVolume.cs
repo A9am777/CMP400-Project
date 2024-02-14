@@ -1,6 +1,13 @@
 #include "RaymarchCommon.lib"
 #include "../Lighting/LightStructs.lib"
 
+#ifndef MACRO_MANAGED
+  #define APPLY_BEER 1
+  #define APPLY_HG 1
+  #define APPLY_SPECTRAL 1
+  #define MARCH_STEP_COUNT 10
+#endif
+
 RWTexture2D<float4> screenOut : register(u0);
 Texture3D<float4> volumeTexture : register(t0);
 SamplerState volumeSampler : register(s0);
@@ -84,8 +91,6 @@ float cubeDensitySample(in Ray ray, in Cube cube)
   return volumeTexture.SampleLevel(volumeSampler, localPos, .5);
 }
 
-
-
 float4 alphaBlend(float4 foreground, float4 background)
 {
   return foreground * foreground.a + (1. - foreground.a) * background;
@@ -100,11 +105,19 @@ float4x4 spectralScatter(float4x4 relativeWavelengths, float angstromExponent)
 // Beer-Lambert law
 float blTransmission(float opticalDepth)
 {
-  return opticalInfo.flagApplyBeer ? exp(-opticalDepth) : 1.;
+  #if APPLY_BEER
+  return exp(-opticalDepth);
+  #else
+  return 1.;
+  #endif
 }
 float blTransmission(float4x4 opticalDepths)
 {
-  return opticalInfo.flagApplyBeer ? exp(-opticalDepths) : 1.;
+  #if APPLY_BEER
+  return exp(-opticalDepths);
+  #else
+  return 1.;
+  #endif
 }
 
 // Beer-Powder approximation of transmission
@@ -119,6 +132,7 @@ float bpTransmission(float4x4 opticalDepths)
 
 float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
 {
+  #if APPLY_HG
   static float intCoeff = 1. / (4. * PI);
   
   float4 numerator = 1. - anisotropicTerms * anisotropicTerms;
@@ -128,7 +142,10 @@ float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
   denominator += float4(1., 1., 1., 1.);
   denominator = pow(denominator, float4(1.5, 1.5, 1.5, 1.5));
 
-  return opticalInfo.flagApplyHG ? numerator / denominator : float4(1., 1., 1., 1.);
+  return numerator / denominator;
+  #else
+  return float4(1., 1., 1., 1.);
+  #endif
 }
 
 #define Phase(angularDistance, anisotropicTerms) hgScatter(angularDistance, anisotropicTerms)
@@ -214,6 +231,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   Integrator irradianceInteZ = { 0, 0, 0, 0, 0 };
   Integrator irradianceInteX2 = { 0, 0, 0, 0, 0 };
   
+  // WTF?
+  // for(uint i = 0; i < MARCH_STEP_COUNT; ++i)
+  
   [loop] // Yeah need to consider this impact
   for (uint i = 0; i < params.iterations; ++i)
   {
@@ -230,18 +250,15 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     // Accumulate intensity as a function of optical thickness
     float4 irradianceSample;
     
-    if (opticalInfo.flagApplySpectral)
-    {
+    #if APPLY_SPECTRAL
       float4x4 baseRadiance = mul(identity, (float1x4)(ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms)));
       float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, opticalInfo.absorptionAngstromExponent)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, opticalInfo.scatterAngstromExponent));
       float4x4 integratorRadiance = mul(transmissions, baseRadiance) * opticalInfo.spectralWeights;
       
       irradianceSample = mul(float1x4(1., 1., 1., 1.), integratorRadiance);
-    }
-    else
-    {
+    #else
       irradianceSample = Transmission(referenceOpticalDepth) * Transmission(referenceScatterOpticalDepth) * (ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms));
-    }
+    #endif
       
     append(irradianceInteX, irradianceSample.x);
     append(irradianceInteY, irradianceSample.y);

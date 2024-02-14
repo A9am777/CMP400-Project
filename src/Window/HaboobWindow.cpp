@@ -199,6 +199,18 @@ namespace Haboob
     // Mirror some shader env macros
     shaderManager.setMacro("MACRO_MANAGED", "1"); // Signal program is taking control
 
+    {
+      auto& marchInfo = raymarchShader.getMarchInfo();
+      shaderManager.setMacro("MARCH_STEP_COUNT", std::to_string(marchInfo.iterations));
+    }
+
+    {
+      auto& opticsInfo = raymarchShader.getOpticsInfo();
+      shaderManager.setMacro("APPLY_BEER", std::to_string(opticsInfo.flagApplyBeer));
+      shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
+      shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
+    }
+
     // If macros changed, recompile shaders!
     shaderManager.bakeMacros(device.getDevice().Get());
   }
@@ -460,11 +472,8 @@ namespace Haboob
         
         ImGui::Text("Flags");
         ImGui::CheckboxFlags("Apply beer", &opticsInfo.flagApplyBeer, ~0);
-        shaderManager.setMacro("APPLY_BEER", std::to_string(opticsInfo.flagApplyBeer));
         ImGui::CheckboxFlags("Apply HG", &opticsInfo.flagApplyHG, ~0);
-        shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
         ImGui::CheckboxFlags("Apply Spectral", &opticsInfo.flagApplySpectral, ~0);
-        shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
       }
     }
     ImGui::End();
