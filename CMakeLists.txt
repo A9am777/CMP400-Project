@@ -25,6 +25,12 @@ startProj(Haboobo)
   # Scripts
   include(${CMAKE_CURRENT_LIST_DIR}/scripts/ExportScripts.cmake)
   exportScripts(Haboobo)
+  
+  # NPerf shenanigans
+  add_custom_command(TARGET Haboobo POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${PROJECT_SOURCE_DIR}/externals/NPerf/NvPerf/bin/x64"
+        $<TARGET_FILE_DIR:Haboobo>)
 
 endProj(Haboobo)
 
