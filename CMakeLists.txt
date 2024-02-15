@@ -32,6 +32,10 @@ startProj(Haboobo)
         "${PROJECT_SOURCE_DIR}/externals/NPerf/NvPerf/bin/x64"
         $<TARGET_FILE_DIR:Haboobo>)
 
+  # Unit tests
+  add_custom_command(TARGET Haboobo POST_BUILD
+        COMMAND $<TARGET_FILE_DIR:Haboobo>/TestApp.exe)
+
 endProj(Haboobo)
 
 setMain(Haboobo)
