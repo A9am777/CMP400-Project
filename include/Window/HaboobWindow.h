@@ -14,6 +14,18 @@
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
 #include "Rendering/Textures/GBuffer.h"
 
+#ifdef NV_PERF_ENABLE_INSTRUMENTATION
+#include "NvPerfReportGeneratorD3D11.h"
+#endif
+
+#ifdef NV_PERF_ENABLE_INSTRUMENTATION
+#include "nvperf_host_impl.h"
+#include "NvPerfHudRenderer.h"
+#include "NvPerfD3D11.h"
+#include "NvPerfHudImPlotRenderer.h"
+#include "NvPerfPeriodicSamplerGpu.h"
+#endif
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace Haboob
@@ -59,6 +71,8 @@ namespace Haboob
     void imguiFrameEnd();
     void imguiFrameResize();
 
+    void hudShenanigans();
+
     void renderGUI();
 
     // Rendering device
@@ -97,5 +111,16 @@ namespace Haboob
     float spherePos[3] = {.0f, .0f, 2.5f};
     UInt mainRasterMode;
     ImGuiContext* imgui;
+
+    #ifdef NV_PERF_ENABLE_INSTRUMENTATION
+    nv::perf::profiler::ReportGeneratorD3D11 g_nvperf;
+    NVPW_Device_ClockStatus g_clockStatus = NVPW_DEVICE_CLOCK_STATUS_UNKNOWN; // Used to restore clock state when exiting
+    const ULONGLONG g_warmupTicks = 500u; /* milliseconds */
+    ULONGLONG g_startTicks = 0u;
+    ULONGLONG g_currentTicks = 0u;
+    nv::perf::sampler::GpuPeriodicSampler m_sampler;
+    nv::perf::hud::HudDataModel m_hudDataModel;
+    nv::perf::hud::HudImPlotRenderer m_hudRenderer;
+    #endif
   };
 }
