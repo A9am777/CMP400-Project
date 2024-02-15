@@ -438,6 +438,7 @@ namespace Haboob
 
   void HaboobWindow::hudShenanigans()
   {
+    #ifdef NV_PERF_ENABLE_INSTRUMENTATION
     uint32_t samplingFrequencyInHz = 60;
     uint32_t samplingIntervalInNs = 1000000000 / samplingFrequencyInHz;
     uint32_t maxDecodeLatencyInNs = 1000000000;
@@ -445,24 +446,27 @@ namespace Haboob
     //m_sampler.BeginSession(m_commandQueue, samplingIntervalInNs, maxDecodeLatencyInNs, maxFrameLatency);
     nv::perf::hud::HudPresets hudPresets;
     auto deviceIdentifiers = m_sampler.GetDeviceIdentifiers();
-    hudPresets.Initialize(deviceIdentifiers.pChipName);
+    hudPresets.Initialize(deviceIdentifiers.pChipName); // "TU102"
     m_hudDataModel.Load(hudPresets.GetPreset("Graphics General Triage"));
     double plotTimeWidthInSeconds = 4.0;
     m_hudDataModel.Initialize(1.0 / samplingFrequencyInHz, plotTimeWidthInSeconds);
-    //m_sampler.SetConfig(&m_hudDataModel.GetCounterConfiguration());
+    m_sampler.SetConfig(m_hudDataModel.GetCounterConfiguration().configImage, 0);
     //m_hudDataModel.PrepareSampleProcessing(m_sampler.GetCounterData());
 
     nv::perf::hud::HudImPlotRenderer::SetStyle();
     m_hudRenderer.Initialize(m_hudDataModel);
+    #endif
   }
 
   void HaboobWindow::renderGUI()
   {
+    #ifdef NV_PERF_ENABLE_INSTRUMENTATION
     if (ImGui::Begin("Graphics General Triage", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
       m_hudRenderer.Render();
     }
     ImGui::End();
+    #endif
 
     if (ImGui::Begin("DEBUGWINDOW", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
