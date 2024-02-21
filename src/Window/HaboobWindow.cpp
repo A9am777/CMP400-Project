@@ -48,6 +48,66 @@ namespace Haboob
     delete deferredPixelShader;
   }
 
+  void HaboobWindow::setupEnv(Environment* environment)
+  {
+    env = environment;
+
+    auto& root = env->getRoot();
+    auto& argRoot = *root.getArgGroup();
+
+    auto cameraGroup = (new EnvironmentGroup(new args::Group(argRoot, "Camera")))->setName("Camera");
+    root.addChildGroup(cameraGroup);
+    {
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &mainCamera.getPosition().x))
+        ->setName("Camera Pos")
+        ->setGUISettings(1.f, -10.f, 10.f));
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float2, nullptr, &mainCamera.getAngles().x))
+        ->setName("Camera Rot")
+        ->setGUISettings(XM_PI * .01f, -XM_PI, XM_PI));
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMoveRate()))
+        ->setName("Camera Speed")
+        ->setGUISettings(1.f, .0f, .0f));
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMouseSensitivity()))
+        ->setName("Camera Look Speed")
+        ->setGUISettings(1.f, .0f, .0f));
+    }
+
+    auto rasterGroup = (new EnvironmentGroup(new args::Group(argRoot, "Raster State")))->setName("Raster State");
+    root.addChildGroup(rasterGroup);
+    {
+      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
+        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterSolid", "If the rasteriser should render solid or wireframe", { "sw" }),
+        &mainRasterMode))
+        ->setName("Solid/Wireframe")
+        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_SOLID));
+      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
+        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterCull", "If the rasteriser should cull at all", { "cl" }),
+        &mainRasterMode))
+        ->setName("Cull")
+        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_CULL));
+      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
+        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterBackface", "The rasteriser should prefer backface culling", { "bf" }),
+        &mainRasterMode))
+        ->setName("Backface/Frontface")
+        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_BACK));
+    }
+
+    //if (ImGui::CollapsingHeader("Raster State"))
+    {
+      //ImGui::CheckboxFlags("Solid/Wireframe", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_SOLID);
+      //ImGui::CheckboxFlags("Cull", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_CULL);
+      //ImGui::CheckboxFlags("Backface/Frontface", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_BACK);
+    }
+
+    //if (ImGui::CollapsingHeader("Camera"))
+    {
+      //ImGui::DragFloat3("Camera Pos", &mainCamera.getPosition().x, 1.f, -10.f, 10.f);
+      //ImGui::DragFloat2("Camera Rot", &mainCamera.getAngles().x, XM_PI * .01f, -XM_PI, XM_PI);
+      //ImGui::DragFloat("Camera Speed", &mainCamera.getMoveRate());
+      //ImGui::DragFloat("Camera Look Speed", &mainCamera.getMouseSensitivity());
+    }
+  }
+
   void HaboobWindow::onStart()
   {
     Window::onStart();
@@ -56,6 +116,8 @@ namespace Haboob
 
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
+
+    env->getRoot().reflectVariables();
 
     {
       auto dev = device.getDevice().Get();
@@ -396,19 +458,16 @@ namespace Haboob
       ImGui::Text("Hello World");
       ImGui::DragFloat3("Sphere Pos", spherePos, 1.f, -10.f, 10.f);
 
-      if (ImGui::CollapsingHeader("Camera"))
+      if (env)
       {
-        ImGui::DragFloat3("Camera Pos", &mainCamera.getPosition().x, 1.f, -10.f, 10.f);
-        ImGui::DragFloat2("Camera Rot", &mainCamera.getAngles().x, XM_PI * .01f, -XM_PI, XM_PI);
-        ImGui::DragFloat("Camera Speed", &mainCamera.getMoveRate());
-        ImGui::DragFloat("Camera Look Speed", &mainCamera.getMouseSensitivity());
+        env->getRoot().imguiGUIShow();
       }
 
-      if (ImGui::CollapsingHeader("Raster State"))
+      //if (ImGui::CollapsingHeader("Raster State"))
       {
-        ImGui::CheckboxFlags("Solid/Wireframe", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_SOLID);
-        ImGui::CheckboxFlags("Cull", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_CULL);
-        ImGui::CheckboxFlags("Backface/Frontface", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_BACK);
+        //ImGui::CheckboxFlags("Solid/Wireframe", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_SOLID);
+        //ImGui::CheckboxFlags("Cull", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_CULL);
+        //ImGui::CheckboxFlags("Backface/Frontface", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_BACK);
       }
 
       if (ImGui::CollapsingHeader("Light"))

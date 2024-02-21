@@ -4,6 +4,7 @@
 #include <VKeys.h>
 #include <MousePointer.h>
 #include <imgui.h>
+#include "Data/EnvironmentArgs.h"
 #include "Rendering/D3DCore.h"
 #include "Rendering/DisplayDevice.h"
 #include "Rendering/Shaders/ShaderManager.h"
@@ -26,6 +27,8 @@ namespace Haboob
     public:
     HaboobWindow();
     ~HaboobWindow();
+    
+    void setupEnv(Environment* environment);
 
     virtual void onStart() override;
     virtual void main() override;
@@ -60,6 +63,9 @@ namespace Haboob
     void imguiFrameResize();
 
     void renderGUI();
+
+    // Environment
+    Environment* env;
 
     // Rendering device
     DisplayDevice device;

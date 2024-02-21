@@ -36,8 +36,8 @@ namespace Haboob
 
   void EnvironmentGroup::imguiGUIShow()
   {
-    bool show = name.length();
-    if (show)
+    bool show = hasGUI;
+    if (name.length())
     {
       show = show && ImGui::CollapsingHeader(name.c_str());
     }
@@ -83,8 +83,8 @@ namespace Haboob
   void EnvironmentVariable::reflect()
   {
     if (!destination || !variableHook) { return; }
-    if (!variableHook->HasFlag()) { return; }
-
+    if (!variableHook->HasFlag() || !variableHook->Matched()) { return; }
+    
     switch (baseType)
     {
       default:
@@ -105,7 +105,7 @@ namespace Haboob
 
         break;
       case Type::Flags:
-        *(UInt*)destination = ((args::ValueFlag<UInt>*)variableHook)->Get();
+        *(UInt*)destination = ((args::ValueFlag<UInt>*)variableHook)->Get() ? BitSet(*(UInt*)destination, *(UInt*)guiSetting1) : BitClear(*(UInt*)destination, *(UInt*)guiSetting1);
         break;
       case Type::Int:
         *(int*)destination = ((args::ValueFlag<int>*)variableHook)->Get();
@@ -161,7 +161,7 @@ namespace Haboob
 
   void EnvironmentVariable::imguiGUIShow()
   {
-    if (!destination) { return; }
+    if (!hasGUI || !destination) { return; }
 
     switch (baseType)
     {
