@@ -17,7 +17,7 @@ startProj(Haboobo)
   defineShaders(Haboobo ${HLSL_TYPE_HEADER} "${Shaders_HLSLI}" 1)
 
   target_compile_features(Haboobo PUBLIC cxx_std_17)
-  target_link_libraries(Haboobo WSTRCore ImGui Catch2::Catch2 args NvPerf NvPerfUtility NPerfHUD)
+  target_link_libraries(Haboobo WSTRCore ImGui Catch2::Catch2 args)
   
   # Testing
   include(${CMAKE_CURRENT_LIST_DIR}/scripts/TestCases.cmake)
@@ -25,12 +25,6 @@ startProj(Haboobo)
   # Scripts
   include(${CMAKE_CURRENT_LIST_DIR}/scripts/ExportScripts.cmake)
   exportScripts(Haboobo)
-  
-  # NPerf shenanigans
-  add_custom_command(TARGET Haboobo POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${PROJECT_SOURCE_DIR}/externals/NPerf/NvPerf/bin/x64"
-        $<TARGET_FILE_DIR:Haboobo>)
 
   # Unit tests
   add_custom_command(TARGET Haboobo POST_BUILD

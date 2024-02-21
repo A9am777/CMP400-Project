@@ -1,14 +1,9 @@
-#define NV_PERF_ENABLE_INSTRUMENTATION
 #include "Window/HaboobWindow.h"
 
 #include <backends/imgui_impl_dx11.h>
 #include <backends/imgui_impl_win32.h>
 
 #include "Rendering/Scene/SceneStructs.h"
-
-#define RYML_SINGLE_HDR_DEFINE_NOW
-#include <ryml_all.hpp>
-#include <implot.h>
 
 namespace Haboob
 {
@@ -65,25 +60,6 @@ namespace Haboob
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, getWidth(), getHeight());
-
-      #ifdef NV_PERF_ENABLE_INSTRUMENTATION
-      {
-        g_startTicks = GetTickCount64();
-        g_nvperf.InitializeReportGenerator(dev);
-        g_nvperf.SetFrameLevelRangeName("Frame");
-        g_nvperf.SetNumNestingLevels(2);
-        g_nvperf.SetMaxNumRanges(2); // "Frame" + "Draw"
-        g_nvperf.outputOptions.directoryName = "HtmlReports\\D3D11_Tutorial02";
-
-        // LoadDriver() must be called first, which is taken care of by InitializeReportGenerator()
-        g_clockStatus = nv::perf::D3D11GetDeviceClockState(dev);
-        nv::perf::D3D11SetDeviceClockState(dev, NVPW_DEVICE_CLOCK_SETTING_LOCK_TO_RATED_TDP);
-
-        hudShenanigans();
-      }
-
-      g_nvperf.StartCollectionOnNextFrame();
-      #endif
 
       // Initialise all shaders
       {
@@ -152,22 +128,13 @@ namespace Haboob
 
     // Handle rendering
     {
-      
       imguiFrameBegin();
-
-      #ifdef NV_PERF_ENABLE_INSTRUMENTATION
-      g_nvperf.OnFrameStart(device.getContext().Get());
-      #endif
       renderBegin();
 
         render();
         device.setBackBufferTarget(); // Safety
         renderOverlay();
         renderMirror();
-
-        #ifdef NV_PERF_ENABLE_INSTRUMENTATION
-        g_nvperf.OnFrameEnd();
-        #endif
 
         renderGUI();
 
@@ -178,11 +145,6 @@ namespace Haboob
 
   void HaboobWindow::onEnd()
   {
-    #ifdef NV_PERF_ENABLE_INSTRUMENTATION
-    g_nvperf.Reset();
-    nv::perf::D3D11SetDeviceClockState(device.getDevice().Get(), g_clockStatus);
-    #endif
-
     imguiEnd();
   }
 
@@ -257,10 +219,6 @@ namespace Haboob
   {
     ID3D11DeviceContext* context = device.getContext().Get();
 
-    #ifdef NV_PERF_ENABLE_INSTRUMENTATION
-    g_nvperf.PushRange("Draw");
-    #endif
-
     // Render the opaque scene in a dirty way
     deferredVertexShader->bindShader(context);
     deferredPixelShader->bindShader(context);
@@ -288,10 +246,6 @@ namespace Haboob
     }
     deferredVertexShader->unbindShader(context);
     deferredPixelShader->unbindShader(context);
-
-    #ifdef NV_PERF_ENABLE_INSTRUMENTATION
-    g_nvperf.PopRange();
-    #endif
   }
 
   void HaboobWindow::createD3D()
@@ -390,7 +344,6 @@ namespace Haboob
   {
     if (imgui = ImGui::CreateContext())
     {
-      ImPlot::CreateContext();
       ImGui::SetCurrentContext(imgui);
       ImGui_ImplWin32_Init(wHandle);
       ImGui_ImplDX11_Init(device.getDevice().Get(), device.getContext().Get());
@@ -406,7 +359,6 @@ namespace Haboob
     {
       ImGui_ImplWin32_Shutdown();
       ImGui_ImplDX11_Shutdown();
-      ImPlot::DestroyContext();
       ImGui::DestroyContext(imgui);
     }
   }
@@ -436,38 +388,8 @@ namespace Haboob
     }
   }
 
-  void HaboobWindow::hudShenanigans()
-  {
-    #ifdef NV_PERF_ENABLE_INSTRUMENTATION
-    uint32_t samplingFrequencyInHz = 60;
-    uint32_t samplingIntervalInNs = 1000000000 / samplingFrequencyInHz;
-    uint32_t maxDecodeLatencyInNs = 1000000000;
-    uint32_t maxFrameLatency = 5;
-    //m_sampler.BeginSession(m_commandQueue, samplingIntervalInNs, maxDecodeLatencyInNs, maxFrameLatency);
-    nv::perf::hud::HudPresets hudPresets;
-    auto deviceIdentifiers = m_sampler.GetDeviceIdentifiers();
-    hudPresets.Initialize(deviceIdentifiers.pChipName); // "TU102"
-    m_hudDataModel.Load(hudPresets.GetPreset("Graphics General Triage"));
-    double plotTimeWidthInSeconds = 4.0;
-    m_hudDataModel.Initialize(1.0 / samplingFrequencyInHz, plotTimeWidthInSeconds);
-    m_sampler.SetConfig(m_hudDataModel.GetCounterConfiguration().configImage, 0);
-    //m_hudDataModel.PrepareSampleProcessing(m_sampler.GetCounterData());
-
-    nv::perf::hud::HudImPlotRenderer::SetStyle();
-    m_hudRenderer.Initialize(m_hudDataModel);
-    #endif
-  }
-
   void HaboobWindow::renderGUI()
   {
-    #ifdef NV_PERF_ENABLE_INSTRUMENTATION
-    if (ImGui::Begin("Graphics General Triage", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
-    {
-      m_hudRenderer.Render();
-    }
-    ImGui::End();
-    #endif
-
     if (ImGui::Begin("DEBUGWINDOW", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
       ImGui::Text("FPS: %f", fps);

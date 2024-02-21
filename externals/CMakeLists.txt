@@ -7,4 +7,3 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/args")
 
 # Naked Libs
 include(${CMAKE_CURRENT_LIST_DIR}/ImGui.cmake)
-include("${CMAKE_CURRENT_LIST_DIR}/NPerf.cmake")
