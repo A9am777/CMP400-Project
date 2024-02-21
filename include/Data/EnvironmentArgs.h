@@ -33,6 +33,7 @@ namespace Haboob
     public:
     enum class Type
     {
+      Symbolic,
       Bool,
       Float,
       Float2,
@@ -63,10 +64,7 @@ namespace Haboob
     EnvironmentVariable* setGUISettings(float speed, int min, int max);
     EnvironmentVariable* setGUISettings(float speed, float min, float max);
     EnvironmentVariable* setGUISettings(float speed, UInt min, UInt max);
-    EnvironmentVariable* setGUISettings(
-      #include "Data/Defs.h"
-      
-      UInt bitMask);
+    EnvironmentVariable* setGUISettings(UInt bitMask);
     void imguiGUIShow();
 
     protected:

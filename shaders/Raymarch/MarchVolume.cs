@@ -88,7 +88,7 @@ float cubeDensitySample(in Ray ray, in Cube cube)
   float3 localPos = ray.pos.xyz - cube.pos.xyz;
   localPos.xyz = localPos.xyz / cube.size;
   
-  return volumeTexture.SampleLevel(volumeSampler, localPos, .5);
+  return volumeTexture.SampleLevel(volumeSampler, localPos, .5).r;
 }
 
 float4 alphaBlend(float4 foreground, float4 background)

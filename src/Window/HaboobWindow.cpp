@@ -55,6 +55,21 @@ namespace Haboob
     auto& root = env->getRoot();
     auto& argRoot = *root.getArgGroup();
 
+    auto testGroup = (new EnvironmentGroup(new args::Group(argRoot, "Profiling"), false))->setName("Profiler");
+    root.addChildGroup(testGroup);
+    {
+      // Await the external profiler before continuing
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Symbolic, new args::ActionFlag(*testGroup->getArgGroup(), "AwaitProfiler", "The application should pause until the profiler connects", { "ap" }, [=]() 
+      {
+        std::cout << "Awaiting Tracy connection... \n";
+        while (!TracyIsConnected)
+        {
+          Sleep(1);
+        }
+        std::cout << "Hello Tracy! \n";
+      }))));
+    }
+
     auto cameraGroup = (new EnvironmentGroup(new args::Group(argRoot, "Camera")))->setName("Camera");
     root.addChildGroup(cameraGroup);
     {
@@ -115,10 +130,6 @@ namespace Haboob
     imguiStart();
 
     tcyCtx = TracyD3D11Context(device.getDevice().Get(), device.getContext().Get());
-    while (!TracyIsConnected)
-    {
-      Sleep(1);
-    }
 
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param

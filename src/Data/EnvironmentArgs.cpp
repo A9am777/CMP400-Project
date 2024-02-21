@@ -167,6 +167,9 @@ namespace Haboob
     {
       default:
         throw std::exception("Not Implemented");
+      case Type::Symbolic:
+        // Nothing, just symbolic
+        break;
       case Type::Bool:
         break;
       case Type::Float:
@@ -208,6 +211,9 @@ namespace Haboob
     {
       default:
         throw std::exception("Not Implemented");
+      case Type::Symbolic:
+        // Nothing, just symbolic
+        break;
       case Type::Bool:
         break;
       case Type::Float:
@@ -243,6 +249,9 @@ namespace Haboob
     {
       default:
         throw std::exception("Not Implemented");
+      case Type::Symbolic:
+        // Nothing, just symbolic
+        break;
       case Type::Bool:
         break;
       case Type::Float:
