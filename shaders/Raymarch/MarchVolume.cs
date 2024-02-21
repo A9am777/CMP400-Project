@@ -108,15 +108,15 @@ float blTransmission(float opticalDepth)
   #if APPLY_BEER
   return exp(-opticalDepth);
   #else
-  return 1.;
+  return 1. / (1. + opticalDepth);
   #endif
 }
-float blTransmission(float4x4 opticalDepths)
+float4x4 blTransmission(float4x4 opticalDepths)
 {
   #if APPLY_BEER
   return exp(-opticalDepths);
   #else
-  return 1.;
+  return ONE_MAT / (ONE_MAT + opticalDepths);
   #endif
 }
 
@@ -137,14 +137,14 @@ float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
   
   float4 numerator = 1. - anisotropicTerms * anisotropicTerms;
   
-  float4 denominator = anisotropicTerms - float4(2., 2., 2., 2.) * angularDistance;
+  float4 denominator = anisotropicTerms - FILL_VEC(2.) * angularDistance;
   denominator = anisotropicTerms * denominator;
-  denominator += float4(1., 1., 1., 1.);
+  denominator += ONE_VEC;
   denominator = pow(denominator, float4(1.5, 1.5, 1.5, 1.5));
 
   return numerator / denominator;
   #else
-  return float4(1., 1., 1., 1.);
+  return ONE_VEC;
   #endif
 }
 
@@ -208,14 +208,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Jump ray forward
   march(ray, params.initialStep);
   
-  float4x4 identity = float4x4(
-  1., .0, .0, .0,
-  .0, 1., .0, .0,
-  .0, .0, 1., .0,
-  .0, .0, .0, 1.
-  );
-  
-  
   float4x4 wavelengths = opticalInfo.spectralWavelengths / 0.743f;
   
   // Directional lighting will have a constant phase along the ray
@@ -251,11 +243,11 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     float4 irradianceSample;
     
     #if APPLY_SPECTRAL
-      float4x4 baseRadiance = mul(identity, (float1x4)(ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms)));
+      float4x4 baseRadiance = mul(IDENTITY_MAT, (float1x4)(ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms)));
       float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, opticalInfo.absorptionAngstromExponent)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, opticalInfo.scatterAngstromExponent));
       float4x4 integratorRadiance = mul(transmissions, baseRadiance) * opticalInfo.spectralWeights;
       
-      irradianceSample = mul(float1x4(1., 1., 1., 1.), integratorRadiance);
+      irradianceSample = mul(ONE_VEC, integratorRadiance);
     #else
       irradianceSample = Transmission(referenceOpticalDepth) * Transmission(referenceScatterOpticalDepth) * (ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms));
     #endif
