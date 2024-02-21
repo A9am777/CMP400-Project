@@ -13,3 +13,6 @@
 [submodule "externals/args"]
 	path = externals/args
 	url = https://github.com/Taywee/args.git
+[submodule "externals/tracy"]
+	path = externals/tracy
+	url = https://github.com/wolfpld/tracy.git

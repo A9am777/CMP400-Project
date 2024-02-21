@@ -289,7 +289,7 @@ namespace Haboob
 
     setupEnvironment(); // Re-register all variables
 
-    for (auto variable : variableCollection)
+    for (auto& variable : variableCollection)
     {
       delete variable.second;
     }

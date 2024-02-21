@@ -7,7 +7,7 @@
 
 namespace Haboob
 {
-  HaboobWindow::HaboobWindow() : imgui{ nullptr }, fps{.0f}
+  HaboobWindow::HaboobWindow() : imgui{ nullptr }, tcyCtx{ nullptr }, fps{ .0f }
   {
     // Controls
     mainCamera.getMoveRate() = 6.f;
@@ -114,6 +114,12 @@ namespace Haboob
     createD3D();
     imguiStart();
 
+    tcyCtx = TracyD3D11Context(device.getDevice().Get(), device.getContext().Get());
+    while (!TracyIsConnected)
+    {
+      Sleep(1);
+    }
+
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
 
@@ -190,6 +196,8 @@ namespace Haboob
 
     // Handle rendering
     {
+      TracyD3D11Zone(tcyCtx, "D3DFrame");
+
       imguiFrameBegin();
       renderBegin();
 
@@ -203,11 +211,15 @@ namespace Haboob
       imguiFrameEnd();
       device.swapBuffer();
     }
+
+    FrameMark;
+    TracyD3D11Collect(tcyCtx);
   }
 
   void HaboobWindow::onEnd()
   {
     imguiEnd();
+    TracyD3D11Destroy(tcyCtx);
   }
 
   void HaboobWindow::onResize()
@@ -249,6 +261,8 @@ namespace Haboob
 
   void HaboobWindow::input(float dt)
   {
+    ZoneNamed(Input, true);
+
     if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) { return; }
 
     mainCamera.update(dt, &keys, &mouse);
@@ -256,6 +270,8 @@ namespace Haboob
 
   void HaboobWindow::update(float dt)
   {
+    ZoneNamed(Update, true);
+
     fps = 1.f / dt;
 
     // Mirror some shader env macros
@@ -279,6 +295,9 @@ namespace Haboob
 
   void HaboobWindow::render()
   {
+    TracyD3D11Zone(tcyCtx, "D3DFrameScene");
+    ZoneNamed(RenderScene, true);
+
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // Render the opaque scene in a dirty way
@@ -352,6 +371,9 @@ namespace Haboob
 
   void HaboobWindow::renderBegin()
   {
+    TracyD3D11Zone(tcyCtx, "D3DFrameBegin");
+    ZoneNamed(RenderBegin, true);
+
     // Render to the main target using vanilla settings
     device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
     device.setDepthEnabled(true);
@@ -361,6 +383,9 @@ namespace Haboob
 
   void HaboobWindow::renderOverlay()
   {
+    TracyD3D11Zone(tcyCtx, "D3DFrameOverlay");
+    ZoneNamed(RenderOverlay, true);
+
     auto context = device.getContext().Get();
 
     // Light data
@@ -391,6 +416,9 @@ namespace Haboob
 
   void HaboobWindow::renderMirror()
   {
+    TracyD3D11Zone(tcyCtx, "D3DFrameMirror");
+    ZoneNamed(RenderMirror, true);
+
     device.clearBackBuffer();
     device.setBackBufferTarget();
     device.setRasterState(DisplayDevice::RasterFlags::RASTER_STATE_DEFAULT);

@@ -15,6 +15,9 @@
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
 #include "Rendering/Textures/GBuffer.h"
 
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyD3D11.hpp>
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace Haboob
@@ -66,6 +69,7 @@ namespace Haboob
 
     // Environment
     Environment* env;
+    tracy::D3D11Ctx* tcyCtx;
 
     // Rendering device
     DisplayDevice device;

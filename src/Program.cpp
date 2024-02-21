@@ -5,13 +5,9 @@
 using namespace Haboob;
 int main(int argc, char* argv[])
 {
-  args::ArgumentParser parser("This is a test program.", "This goes after the options.");
-
-  args::HelpFlag help(parser, "help", "Display this help menu", { 'h', "help" });
-  args::Group group(parser, "This group is all exclusive:", args::Group::Validators::DontCare);
-  args::Flag foo(group, "foo", "The foo flag", { 'f', "foo" });
+  args::ArgumentParser parser("Render a beautiful haboob.", "Noot noot");
+  args::HelpFlag help(parser, "help", "Display this help menu.", { 'h', "help" });
   args::CompletionFlag completion(parser, { "complete" });
-  //args::ValueFlag<float> f;
 
   Environment env(&parser);
   HaboobWindow app;
