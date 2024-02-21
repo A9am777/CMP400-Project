@@ -125,7 +125,7 @@ float bpTransmission(float opticalDepth)
 {
   return blTransmission(opticalDepth) - blTransmission(opticalInfo.powderCoefficient * opticalDepth);
 }
-float bpTransmission(float4x4 opticalDepths)
+float4x4 bpTransmission(float4x4 opticalDepths)
 {
   return blTransmission(opticalDepths) - blTransmission(opticalInfo.powderCoefficient * opticalDepths);
 }
