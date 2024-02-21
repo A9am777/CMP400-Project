@@ -25,7 +25,7 @@ namespace Haboob
   {
     static float normalClearColour[4] = { .0f, .0f, -1.f, .0f };
 
-    diffuseTarget.clear(context, RenderTarget::defaultWhite);
+    diffuseTarget.clear(context, RenderTarget::defaultBlack);
     normalDepthTarget.clear(context, normalClearColour);
     litColourTarget.clear(context, RenderTarget::defaultBlack);
   }
