@@ -8,7 +8,6 @@ function(exportScripts target)
    # Shorthands
    set(trueOutputDir "$<TARGET_FILE_DIR:${target}>")
 
-   # Compiled shaders
    foreach(script ${ExportScripts})
       getPureFilename(${script} scriptFilename)
       string(REPLACE "${trueCopyDir}" "" scriptRelFile "${script}")

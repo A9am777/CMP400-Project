@@ -1,4 +1,5 @@
 # Externals
+These modules are automatically managed.
 Module | Folder | Owned | Desc
 --- | --- | --- | ---
 CMakeGym | CMakeGym | :heavy_check_mark: | CMake SDK for build automation

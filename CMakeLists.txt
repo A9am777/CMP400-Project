@@ -26,6 +26,10 @@ startProj(Haboobo)
   include(${CMAKE_CURRENT_LIST_DIR}/scripts/ExportScripts.cmake)
   exportScripts(Haboobo)
 
+  # Unit tests
+  add_custom_command(TARGET Haboobo POST_BUILD
+        COMMAND $<TARGET_FILE_DIR:Haboobo>/TestApp.exe)
+
 endProj(Haboobo)
 
 setMain(Haboobo)

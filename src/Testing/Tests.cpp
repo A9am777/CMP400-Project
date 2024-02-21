@@ -4,9 +4,9 @@ unsigned int Factorial(unsigned int number) {
   return number <= 1 ? number : Factorial(number - 1) * number;
 }
 
-TEST_CASE("Example", "[ex]") {
-  REQUIRE(1 == 1);
+TEST_CASE("TEST TESTS", "[ex]") {
+  REQUIRE(Factorial(1) == 1);
   REQUIRE(2 == 2);
   REQUIRE(0x06 == 6);
-  REQUIRE(1 << 2 == 3);
+  REQUIRE(1 << 2 == 4);
 }

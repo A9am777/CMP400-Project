@@ -1,2 +1,2 @@
-Haboobo.exe help
+Haboobo.exe --help
 cmd /k
