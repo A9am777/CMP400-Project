@@ -612,7 +612,9 @@ namespace Haboob
       raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &marchInfo.marchZStep))
         ->setName("Step size")
         ->setGUISettings(1.f, .0f, 100.f));
-      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Int, nullptr, &marchInfo.iterations))
+      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Int, 
+        new args::ValueFlag<UInt>(*raymarchGroup->getArgGroup(), "SampleCount", "The number of samples per ray", { "it" }),
+        &marchInfo.iterations))
         ->setName("Step count")
         ->setGUISettings(1.f, 0, 100));
       raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &marchInfo.flagManualMarch))
