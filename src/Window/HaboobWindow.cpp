@@ -34,9 +34,15 @@ namespace Haboob
 
     env->getRoot().reflectVariables();
 
+    if (!showWindow)
+    {
+      ShowWindow(wHandle, SW_HIDE);
+      std::cout << "Display window hidden\n";
+    }
+
     {
       auto dev = device.getDevice().Get();
-      gbuffer.create(dev, getWidth(), getHeight());
+      gbuffer.create(dev, requiredWidth, requiredHeight);
 
       // Initialise all shaders
       {
@@ -118,11 +124,21 @@ namespace Haboob
         renderGUI();
 
       imguiFrameEnd();
-      device.swapBuffer();
+      if (showWindow) { device.swapBuffer(); }
     }
 
     FrameMark;
     TracyD3D11Collect(tcyCtx);
+
+    if (exitAfterFrame)
+    {
+      if (outputFrame)
+      {
+        // TODO
+      }
+
+      open = false;
+    }
   }
 
   void HaboobWindow::onEnd()
@@ -133,9 +149,14 @@ namespace Haboob
 
   void HaboobWindow::onResize()
   {
+    if (!dynamicResolution) { return; }
+
+    requiredWidth = getWidth();
+    requiredHeight = getHeight();
+
     if (device.getContext())
     {
-      device.resizeBackBuffer(getWidth(), getHeight());
+      device.resizeBackBuffer(requiredWidth, requiredHeight);
     }
 
     adjustProjection();
@@ -175,6 +196,11 @@ namespace Haboob
     if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) { return; }
 
     mainCamera.update(dt, &keys, &mouse);
+
+    if (keys.isKeyPress('G'))
+    {
+      showGUI = !showGUI;
+    }
   }
 
   void HaboobWindow::update(float dt)
@@ -242,7 +268,7 @@ namespace Haboob
   {
     device.create(D3D11_CREATE_DEVICE_BGRA_SUPPORT);
     device.makeSwapChain(wHandle);
-    device.resizeBackBuffer(getWidth(), getHeight());
+    device.resizeBackBuffer(requiredWidth, requiredHeight);
     device.makeStates();
 
     mainRasterMode = static_cast<UInt>(device.getRasterState());
@@ -251,11 +277,11 @@ namespace Haboob
 
   void HaboobWindow::adjustProjection()
   {
-    gbuffer.resize(device.getDevice().Get(), getWidth(), getHeight());
+    gbuffer.resize(device.getDevice().Get(), requiredWidth, requiredHeight);
 
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
-    float screenAspect = float(getWidth()) / float(getHeight());
+    float screenAspect = float(requiredWidth) / float(requiredHeight);
 
     float nearZ = .1f;
     float farZ = 100.f;
@@ -380,8 +406,9 @@ namespace Haboob
     if (imgui)
     {
       ImVec2 wSize = ImVec2{ float(getWidth()), float(getHeight()) };
+      ImVec2 dSize = ImVec2{ float(requiredWidth), float(requiredHeight) };
       ImGui::SetNextWindowSize(wSize);
-      ImGui::GetIO().DisplaySize = wSize;
+      ImGui::GetIO().DisplaySize = dSize;
 
       ImGui_ImplDX11_InvalidateDeviceObjects();
     }
@@ -389,6 +416,8 @@ namespace Haboob
 
   void HaboobWindow::renderGUI()
   {
+    if (!showGUI) { return; }
+
     if (ImGui::Begin("DEBUGWINDOW", nullptr, ImGuiWindowFlags_::ImGuiWindowFlags_None))
     {
       ImGui::Text("FPS: %f", fps);
@@ -411,6 +440,15 @@ namespace Haboob
 
   void HaboobWindow::setupDefaults()
   {
+    // Important configs
+    showWindow = true;
+    dynamicResolution = true;
+    outputFrame = false;
+    exitAfterFrame = false;
+    showGUI = true;
+    requiredWidth = 256;
+    requiredHeight = 256;
+
     // Controls
     mainCamera.getMoveRate() = 6.f;
     mainCamera.getPosition() = { -8.42f, .93f, -1.41f };

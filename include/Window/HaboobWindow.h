@@ -73,6 +73,15 @@ namespace Haboob
     Environment* env;
     tracy::D3D11Ctx* tcyCtx;
 
+    // Top level args
+    bool showWindow; // Window should be displayed
+    bool dynamicResolution; // Scale with window?
+    bool outputFrame; // Saves image to file
+    bool exitAfterFrame; // Exits after the first frame
+    bool showGUI;
+    int requiredWidth;
+    int requiredHeight;
+
     // Rendering device
     DisplayDevice device;
 
