@@ -52,6 +52,8 @@ namespace Haboob
 
     LRESULT customRoutine(UINT message, WPARAM wParam, LPARAM lParam) override;
 
+    void setupDefaults();
+
     // Strictly for testing purposes - forces the camera buffer to be resent
     void redoCameraBuffer(ID3D11DeviceContext* context);
 

@@ -9,34 +9,7 @@ namespace Haboob
 {
   HaboobWindow::HaboobWindow() : imgui{ nullptr }, tcyCtx{ nullptr }, fps{ .0f }
   {
-    // Controls
-    mainCamera.getMoveRate() = 6.f;
-    mainCamera.getPosition() = { -8.42f, .93f, -1.41f };
-    mainCamera.getAngles() = { 1.36f, .1f, .0f };
-
-    // Main rendering params
-    mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
-    gbuffer.getGamma() = .2f;
-    gbuffer.getExposure() = 1.3f;
-    dirLightPack.diffuse = { 3.96f, 3.92f, 3.14f };
-    dirLightPack.ambient = { 0.96f, 0.92f, 0.14f };
-    dirLightPack.direction = { -1.f, .25f, .0f, 1.f };
-
-    // Raymarch params
-    {
-      auto& opticsInfo = raymarchShader.getOpticsInfo();
-
-      opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
-      opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
-      opticsInfo.phaseBlendWeightTerms = { .09f, .09f, .09f, .09f, };
-      opticsInfo.scatterAngstromExponent = 3.1f;
-
-      opticsInfo.absorptionAngstromExponent = 2.1f;
-      opticsInfo.powderCoefficient = .1f;
-      opticsInfo.attenuationFactor = 12.1f;
-    }
-
-    raymarchShader.getMarchInfo().iterations = 26;
+    setupDefaults();
 
     // Produce standalone shaders
     deferredVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV", true);
@@ -46,81 +19,6 @@ namespace Haboob
   {
     delete deferredVertexShader;
     delete deferredPixelShader;
-  }
-
-  void HaboobWindow::setupEnv(Environment* environment)
-  {
-    env = environment;
-
-    auto& root = env->getRoot();
-    auto& argRoot = *root.getArgGroup();
-
-    auto testGroup = (new EnvironmentGroup(new args::Group(argRoot, "Profiling"), false))->setName("Profiler");
-    root.addChildGroup(testGroup);
-    {
-      // Await the external profiler before continuing
-      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Symbolic, new args::ActionFlag(*testGroup->getArgGroup(), "AwaitProfiler", "The application should pause until the profiler connects", { "ap" }, [=]() 
-      {
-        std::cout << "Awaiting Tracy connection... \n";
-        while (!TracyIsConnected)
-        {
-          Sleep(1);
-        }
-        std::cout << "Hello Tracy! \n";
-      }))));
-    }
-
-    auto cameraGroup = (new EnvironmentGroup(new args::Group(argRoot, "Camera")))->setName("Camera");
-    root.addChildGroup(cameraGroup);
-    {
-      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &mainCamera.getPosition().x))
-        ->setName("Camera Pos")
-        ->setGUISettings(1.f, -10.f, 10.f));
-      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float2, nullptr, &mainCamera.getAngles().x))
-        ->setName("Camera Rot")
-        ->setGUISettings(XM_PI * .01f, -XM_PI, XM_PI));
-      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMoveRate()))
-        ->setName("Camera Speed")
-        ->setGUISettings(1.f, .0f, .0f));
-      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMouseSensitivity()))
-        ->setName("Camera Look Speed")
-        ->setGUISettings(1.f, .0f, .0f));
-    }
-
-    auto rasterGroup = (new EnvironmentGroup(new args::Group(argRoot, "Raster State")))->setName("Raster State");
-    root.addChildGroup(rasterGroup);
-    {
-      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
-        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterSolid", "If the rasteriser should render solid or wireframe", { "sw" }),
-        &mainRasterMode))
-        ->setName("Solid/Wireframe")
-        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_SOLID));
-      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
-        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterCull", "If the rasteriser should cull at all", { "cl" }),
-        &mainRasterMode))
-        ->setName("Cull")
-        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_CULL));
-      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
-        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterBackface", "The rasteriser should prefer backface culling", { "bf" }),
-        &mainRasterMode))
-        ->setName("Backface/Frontface")
-        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_BACK));
-    }
-
-    //if (ImGui::CollapsingHeader("Raster State"))
-    {
-      //ImGui::CheckboxFlags("Solid/Wireframe", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_SOLID);
-      //ImGui::CheckboxFlags("Cull", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_CULL);
-      //ImGui::CheckboxFlags("Backface/Frontface", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_BACK);
-    }
-
-    //if (ImGui::CollapsingHeader("Camera"))
-    {
-      //ImGui::DragFloat3("Camera Pos", &mainCamera.getPosition().x, 1.f, -10.f, 10.f);
-      //ImGui::DragFloat2("Camera Rot", &mainCamera.getAngles().x, XM_PI * .01f, -XM_PI, XM_PI);
-      //ImGui::DragFloat("Camera Speed", &mainCamera.getMoveRate());
-      //ImGui::DragFloat("Camera Look Speed", &mainCamera.getMouseSensitivity());
-    }
   }
 
   void HaboobWindow::onStart()
@@ -502,78 +400,229 @@ namespace Haboob
         env->getRoot().imguiGUIShow();
       }
 
-      //if (ImGui::CollapsingHeader("Raster State"))
+      if (ImGui::Button("Regen Haboob"))
       {
-        //ImGui::CheckboxFlags("Solid/Wireframe", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_SOLID);
-        //ImGui::CheckboxFlags("Cull", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_CULL);
-        //ImGui::CheckboxFlags("Backface/Frontface", &mainRasterMode, (UInt)DisplayDevice::RASTER_FLAG_BACK);
-      }
-
-      if (ImGui::CollapsingHeader("Light"))
-      {
-        ImGui::DragFloat3("Light direction", &dirLightPack.direction.x);
-        ImGui::DragFloat3("Light colour", &dirLightPack.diffuse.x);
-        ImGui::DragFloat3("Light ambient", &dirLightPack.ambient.x);
-        ImGui::DragFloat("Gamma", &gbuffer.getGamma());
-        ImGui::DragFloat("Exposure", &gbuffer.getExposure());
-      }
-
-      if (ImGui::CollapsingHeader("Haboob"))
-      {
-        auto& volumeInfo = haboobVolume.getVolumeInfo();
-        ImGui::DragInt3("Haboob Resolution", (int*)&volumeInfo.size, .1f, 0, 1024);
-
-        ImGui::DragScalarN("Haboob Seed", ImGuiDataType_U32, &volumeInfo.seed, 4);
-
-        ImGui::DragFloat("Haboob World Size", &volumeInfo.worldSize, .1f, 0, 10.f);
-        ImGui::DragFloat("Haboob Octaves", &volumeInfo.octaves, .1f, .1f, 8.1f);
-        ImGui::DragFloat("Haboob Fractional Gap", &volumeInfo.fractionalGap, .0f, 0, 10.f);
-        ImGui::DragFloat("Haboob Fractional Increment", &volumeInfo.fractionalIncrement, .0f, 0, 10.f);
-
-        ImGui::DragFloat("Haboob FBM Offset", &volumeInfo.fbmOffset, .0f, 0, 10.f);
-        ImGui::DragFloat("Haboob FBM Scale", &volumeInfo.fbmScale, .0f, 0, 10.f);
-
-        ImGui::DragFloat("Haboob Wacky Power (tm)", &volumeInfo.wackyPower, .0f, 0, 10.f);
-        ImGui::DragFloat("Haboob Wacky Scale (tm)", &volumeInfo.wackyScale, .0f, 0, 10.f);
-
-        if (ImGui::Button("Regen Haboob"))
-        {
-          haboobVolume.rebuild(device.getDevice().Get());
-          haboobVolume.render(device.getContext().Get());
-        }
-      }
-
-      if (ImGui::CollapsingHeader("Raymarch"))
-      {
-        auto& marchInfo = raymarchShader.getMarchInfo();
-        ImGui::DragFloat("Initial step size", &marchInfo.initialZStep);
-        ImGui::DragFloat("Step size", &marchInfo.marchZStep);
-        ImGui::DragInt("Step count", (int*)&marchInfo.iterations, .1f, 0, 100);
-        ImGui::CheckboxFlags("Use manual step", &marchInfo.flagManualMarch, ~0);
-      }
-
-      if (ImGui::CollapsingHeader("Optics"))
-      {
-        auto& opticsInfo = raymarchShader.getOpticsInfo();
-        
-        ImGui::Text("Phase");
-        ImGui::DragFloat4("Henyey-Greenstein anisotropy (f)", &opticsInfo.anisotropicForwardTerms.x);
-        ImGui::DragFloat4("Henyey-Greenstein anisotropy (b)", &opticsInfo.anisotropicBackwardTerms.x);
-        ImGui::DragFloat4("Phase blend", &opticsInfo.phaseBlendWeightTerms.x);
-        ImGui::DragFloat("Scattering angstrom exponent", &opticsInfo.scatterAngstromExponent);
-        
-        ImGui::Text("Transmission");
-        ImGui::DragFloat("Absorption angstrom exponent", &opticsInfo.absorptionAngstromExponent);
-        ImGui::DragFloat("Beers Powder coefficient", &opticsInfo.powderCoefficient);
-        ImGui::DragFloat("Attenuation scale", &opticsInfo.attenuationFactor);
-        ImGui::DragFloat("Attenuation efEeEe", &opticsInfo.referenceWavelength);
-        
-        ImGui::Text("Flags");
-        ImGui::CheckboxFlags("Apply beer", &opticsInfo.flagApplyBeer, ~0);
-        ImGui::CheckboxFlags("Apply HG", &opticsInfo.flagApplyHG, ~0);
-        ImGui::CheckboxFlags("Apply Spectral", &opticsInfo.flagApplySpectral, ~0);
+        haboobVolume.rebuild(device.getDevice().Get());
+        haboobVolume.render(device.getContext().Get());
       }
     }
     ImGui::End();
+  }
+
+  void HaboobWindow::setupDefaults()
+  {
+    // Controls
+    mainCamera.getMoveRate() = 6.f;
+    mainCamera.getPosition() = { -8.42f, .93f, -1.41f };
+    mainCamera.getAngles() = { 1.36f, .1f, .0f };
+
+    // Main rendering params
+    mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
+    gbuffer.getGamma() = .2f;
+    gbuffer.getExposure() = 1.3f;
+    dirLightPack.diffuse = { 3.96f, 3.92f, 3.14f };
+    dirLightPack.ambient = { 0.96f, 0.92f, 0.14f };
+    dirLightPack.direction = { -1.f, .25f, .0f, 1.f };
+
+    // Raymarch params
+    {
+      auto& opticsInfo = raymarchShader.getOpticsInfo();
+
+      opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
+      opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
+      opticsInfo.phaseBlendWeightTerms = { .09f, .09f, .09f, .09f, };
+      opticsInfo.scatterAngstromExponent = 3.1f;
+
+      opticsInfo.absorptionAngstromExponent = 2.1f;
+      opticsInfo.powderCoefficient = .035f;
+      opticsInfo.attenuationFactor = 12.1f;
+    }
+
+    raymarchShader.getMarchInfo().iterations = 26;
+  }
+
+  void HaboobWindow::setupEnv(Environment* environment)
+  {
+    env = environment;
+
+    auto& root = env->getRoot();
+    auto& argRoot = *root.getArgGroup();
+
+    {
+      auto testGroup = (new EnvironmentGroup(new args::Group(argRoot, "Profiling"), false))->setName("Profiler");
+      root.addChildGroup(testGroup);
+
+      // Await the external profiler before continuing
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Symbolic, new args::ActionFlag(*testGroup->getArgGroup(), "AwaitProfiler", "The application should pause until the profiler connects", { "ap" }, [=]()
+        {
+          std::cout << "Awaiting Tracy connection... \n";
+          while (!TracyIsConnected)
+          {
+            Sleep(1);
+          }
+          std::cout << "Hello Tracy! \n";
+        }))));
+    }
+
+    {
+      auto cameraGroup = (new EnvironmentGroup(new args::Group(argRoot, "Camera")))->setName("Camera");
+      root.addChildGroup(cameraGroup);
+
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &mainCamera.getPosition().x))
+        ->setName("Camera Pos")
+        ->setGUISettings(1.f, -10.f, 10.f));
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float2, nullptr, &mainCamera.getAngles().x))
+        ->setName("Camera Rot")
+        ->setGUISettings(XM_PI * .01f, -XM_PI, XM_PI));
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMoveRate()))
+        ->setName("Camera Speed")
+        ->setGUISettings(1.f, .0f, .0f));
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMouseSensitivity()))
+        ->setName("Camera Look Speed")
+        ->setGUISettings(1.f, .0f, .0f));
+    }
+
+    {
+      auto rasterGroup = (new EnvironmentGroup(new args::Group(argRoot, "Raster State")))->setName("Raster State");
+      root.addChildGroup(rasterGroup);
+
+      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
+        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterSolid", "If the rasteriser should render solid or wireframe", { "sw" }),
+        &mainRasterMode))
+        ->setName("Solid/Wireframe")
+        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_SOLID));
+      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
+        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterCull", "If the rasteriser should cull at all", { "cl" }),
+        &mainRasterMode))
+        ->setName("Cull")
+        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_CULL));
+      rasterGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags,
+        new args::ValueFlag<UInt>(*rasterGroup->getArgGroup(), "RasterBackface", "The rasteriser should prefer backface culling", { "bf" }),
+        &mainRasterMode))
+        ->setName("Backface/Frontface")
+        ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_BACK));
+    }
+
+    {
+      auto lightGroup = (new EnvironmentGroup(new args::Group(argRoot, "Light")))->setName("Light");
+      root.addChildGroup(lightGroup);
+
+      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &dirLightPack.direction.x))
+        ->setName("Light direction")
+        ->setGUISettings(1.f, .0f, .0f));
+      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &dirLightPack.diffuse.x))
+        ->setName("Light colour")
+        ->setGUISettings(1.f, .0f, .0f));
+      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &dirLightPack.ambient.x))
+        ->setName("Light ambient")
+        ->setGUISettings(1.f, .0f, .0f));
+      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &gbuffer.getGamma()))
+        ->setName("Gamma")
+        ->setGUISettings(1.f, .0f, .0f));
+      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &gbuffer.getExposure()))
+        ->setName("Exposure")
+        ->setGUISettings(1.f, .0f, .0f));
+    }
+
+    {
+      auto haboobGroup = (new EnvironmentGroup(new args::Group(argRoot, "HaboobGen")))->setName("Haboob");
+      root.addChildGroup(haboobGroup);
+
+      auto& volumeInfo = haboobVolume.getVolumeInfo();
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Int3, nullptr, &volumeInfo.size))
+        ->setName("Haboob Resolution")
+        ->setGUISettings(1.f, 0, 1024));
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::UInt4, nullptr, &volumeInfo.seed))
+        ->setName("Haboob Seed"));
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.worldSize))
+        ->setName("Haboob World Size")
+        ->setGUISettings(1.f, .0f, 10.f));
+
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.octaves))
+        ->setName("Haboob Octaves Size")
+        ->setGUISettings(1.f, .1f, 8.1f));
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.fractionalGap))
+        ->setName("Haboob Fractional Gap")
+        ->setGUISettings(1.f, .0f, 10.f));
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.fractionalIncrement))
+        ->setName("Haboob Fractional Increment")
+        ->setGUISettings(1.f, .0f, 10.f));
+
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.fbmOffset))
+        ->setName("Haboob FBM Offset")
+        ->setGUISettings(1.f, .0f, 10.f));
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.fbmScale))
+        ->setName("Haboob FBM Scale")
+        ->setGUISettings(1.f, .0f, 10.f));
+
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.wackyPower))
+        ->setName("Haboob Wacky Power (tm)")
+        ->setGUISettings(1.f, .0f, 10.f));
+      haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.wackyScale))
+        ->setName("Haboob Wacky Scale (tm)")
+        ->setGUISettings(1.f, .0f, 10.f));
+    }
+
+    {
+      auto raymarchGroup = (new EnvironmentGroup(new args::Group(argRoot, "Raymarch")))->setName("Raymarch");
+      root.addChildGroup(raymarchGroup);
+
+      auto& marchInfo = raymarchShader.getMarchInfo();
+      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &marchInfo.initialZStep))
+        ->setName("Initial Step Size")
+        ->setGUISettings(1.f, .0f, 100.f));
+      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &marchInfo.marchZStep))
+        ->setName("Step size")
+        ->setGUISettings(1.f, .0f, 100.f));
+      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Int, nullptr, &marchInfo.iterations))
+        ->setName("Step count")
+        ->setGUISettings(1.f, 0, 100));
+      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &marchInfo.flagManualMarch))
+        ->setName("Use manual step")
+        ->setGUISettings(~0));
+    }
+
+    {
+      auto opticsGroup = (new EnvironmentGroup(new args::Group(argRoot, "Optics")))->setName("Optics");
+      root.addChildGroup(opticsGroup);
+
+      auto& opticsInfo = raymarchShader.getOpticsInfo();
+
+      // Phase
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float4, nullptr, &opticsInfo.anisotropicForwardTerms.x))
+        ->setName("Henyey-Greenstein anisotropy (f)")
+        ->setGUISettings(.1f, .0f, 2.f));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float4, nullptr, &opticsInfo.anisotropicBackwardTerms.x))
+        ->setName("Henyey-Greenstein anisotropy (b)")
+        ->setGUISettings(.1f, .0f, 2.f));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float4, nullptr, &opticsInfo.phaseBlendWeightTerms.x))
+        ->setName("Phase blend")
+        ->setGUISettings(.01f, .0f, 1.f));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.scatterAngstromExponent))
+        ->setName("Scattering angstrom exponent")
+        ->setGUISettings(1.f, .0f, 100.f));
+
+      // Transmission
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.absorptionAngstromExponent))
+        ->setName("Absorption angstrom exponent")
+        ->setGUISettings(1.f, .0f, 100.f));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.powderCoefficient))
+        ->setName("Beers Powder coefficient")
+        ->setGUISettings(.001f, .0f, 1.f));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.attenuationFactor))
+        ->setName("Attenuation scale")
+        ->setGUISettings(1.f, .0f, 100.f));
+
+      // Flags
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplyBeer))
+        ->setName("Apply beer")
+        ->setGUISettings(~0));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplyHG))
+        ->setName("Apply HG")
+        ->setGUISettings(~0));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplySpectral))
+        ->setName("Apply Spectral")
+        ->setGUISettings(~0));
+    }
   }
 }

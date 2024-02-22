@@ -5,6 +5,7 @@
 #include <args.hxx>
 #include <set>
 #include <map>
+#include <vector>
 
 namespace Haboob
 {
@@ -97,16 +98,16 @@ namespace Haboob
 
     inline EnvironmentGroup* setName(const std::string& newName) { name = newName; return this; }
 
-    inline void addVariable(EnvironmentVariable* variable) { if (variable) { variables.insert(variable); } }
-    inline void addChildGroup(EnvironmentGroup* group) { if (group) { groups.insert(group); } }
+    inline void addVariable(EnvironmentVariable* variable) { if (variable) { variables.push_back(variable); } }
+    inline void addChildGroup(EnvironmentGroup* group) { if (group) { groups.push_back(group); } }
 
-    inline std::set<EnvironmentGroup*>& getChildGroups() { return groups; }
-    inline std::set<EnvironmentVariable*>& getVariables() { return variables; }
+    inline std::vector<EnvironmentGroup*>& getChildGroups() { return groups; }
+    inline std::vector<EnvironmentVariable*>& getVariables() { return variables; }
 
     protected:
     args::Group* groupHook; // The group program argument hook (voidable)
-    std::set<EnvironmentVariable*> variables;
-    std::set<EnvironmentGroup*> groups;
+    std::vector<EnvironmentVariable*> variables;
+    std::vector<EnvironmentGroup*> groups;
   };
 
   class Environment
