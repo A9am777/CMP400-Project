@@ -54,6 +54,9 @@ namespace Haboob
 
     void setupDefaults();
 
+    // Captures the backbuffer and saves to file
+    HRESULT exportFrame(); // Slow
+
     // Strictly for testing purposes - forces the camera buffer to be resent
     void redoCameraBuffer(ID3D11DeviceContext* context);
 
@@ -74,6 +77,7 @@ namespace Haboob
     tracy::D3D11Ctx* tcyCtx;
 
     // Top level args
+    std::wstring exportLocation;
     bool showWindow; // Window should be displayed
     bool dynamicResolution; // Scale with window?
     bool outputFrame; // Saves image to file

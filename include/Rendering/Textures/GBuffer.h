@@ -58,6 +58,9 @@ namespace Haboob
     // Renders to another target using the lit texture
     void renderFromLit(ID3D11DeviceContext* context);
 
+    // Captures the lit buffer to CPU
+    HRESULT capture(ID3D11Device* device, ID3D11DeviceContext* context, std::vector<Byte>& buffer, UInt& width, UInt& height); // VERY SLOW
+
     inline RenderTarget& getLitColourTarget() { return litColourTarget; }
 
     inline float& getGamma() { return gamma; }

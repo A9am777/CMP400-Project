@@ -7,7 +7,7 @@ namespace Haboob
     255,
     4,
     1,
-    DXGI_FORMAT_R32G32B32A32_FLOAT,
+    DXGI_FORMAT_R16G16B16A16_FLOAT,
     {1, 0},
     D3D11_USAGE_DEFAULT,
     D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS,
@@ -94,7 +94,7 @@ namespace Haboob
     {
       D3D11_UNORDERED_ACCESS_VIEW_DESC computeAccessDesc;
       ZeroMemory(&computeAccessDesc, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
-      computeAccessDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+      computeAccessDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
       computeAccessDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
       computeAccessDesc.Texture2D.MipSlice = 0;
 
