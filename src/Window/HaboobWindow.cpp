@@ -5,15 +5,6 @@
 
 #include "Rendering/Scene/SceneStructs.h"
 
-// Image export boilerplate
-#include "gdiplus.h"
-#include "gdiplusheaders.h"
-#include "gdiplusimagecodec.h"
-#include "Shlwapi.h"
-#pragma comment (lib,"gdi32")
-#pragma comment (lib,"Gdiplus")
-#pragma comment (lib,"shlwapi")
-
 namespace Haboob
 {
   HaboobWindow::HaboobWindow() : imgui{ nullptr }, tcyCtx{ nullptr }, fps{ .0f }
@@ -123,12 +114,13 @@ namespace Haboob
     // Handle rendering
     {
       TracyD3D11Zone(tcyCtx, "D3DFrame");
-
+      
       imguiFrameBegin();
       renderBegin();
 
         render();
         device.setBackBufferTarget(); // Safety
+        
         renderOverlay();
         renderMirror();
 
@@ -323,6 +315,7 @@ namespace Haboob
     // Render to the main target using vanilla settings
     device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
     device.setDepthEnabled(true);
+    device.clearBackBuffer();
     gbuffer.clear(device.getContext().Get());
     gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
   }
@@ -449,82 +442,15 @@ namespace Haboob
     ImGui::End();
   }
 
-  int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
-  {
-    // https://learn.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-retrieving-the-class-identifier-for-an-encoder-use
-
-    UINT  num = 0;          // number of image encoders
-    UINT  size = 0;         // size of the image encoder array in bytes
-
-    Gdiplus::ImageCodecInfo* pImageCodecInfo = NULL;
-
-    Gdiplus::GetImageEncodersSize(&num, &size);
-    if (size == 0)
-      return -1;  // Failure
-
-    pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
-    if (pImageCodecInfo == NULL)
-      return -1;  // Failure
-
-    Gdiplus::GetImageEncoders(num, size, pImageCodecInfo);
-
-    for (UINT j = 0; j < num; ++j)
-    {
-      if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
-      {
-        *pClsid = pImageCodecInfo[j].Clsid;
-        free(pImageCodecInfo);
-        return j;  // Success
-      }
-    }
-
-    free(pImageCodecInfo);
-    return -1;  // Failure
-  }
-
   HRESULT HaboobWindow::exportFrame()
   {
-    HRESULT result = S_OK;
-
-    UInt width = 0;
-    UInt height = 0;
-    std::vector<Byte> data;
-    result = gbuffer.capture(device.getDevice().Get(), device.getContext().Get(), data, width, height);
-
-    {
-      using namespace Gdiplus;
-
-      GdiplusStartupInput gdiplusStartupInput;
-      ULONG_PTR gdiplusToken;
-      GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-      
-      Bitmap* bit = new Bitmap(int(width), int(height), int(8 * width), PixelFormat64bppARGB, data.data());
-      
-      exportLocation = L"C:/Users/Adam/source/builds/uni/CMP400/Debug/test.bmp";
-
-      CLSID pngClsid;
-      GetEncoderClsid(L"image/bmp", &pngClsid);
-
-      IStream* stream;
-      SHCreateStreamOnFileW(exportLocation.c_str(), STGM_READWRITE | STGM_CREATE, &stream);
-      if (stream)
-      {
-        bit->Save(stream, &pngClsid, nullptr);
-      }
-
-      delete bit;
-      stream->Release();
-
-      GdiplusShutdown(gdiplusToken);
-    }
-
-    return result;
+    return gbuffer.capture(exportLocation, device.getContext().Get());
   }
 
   void HaboobWindow::setupDefaults()
   {
     // Important configs
-    exportLocation = L"test.bmp";
+    exportLocation = L"test.dds";
     showWindow = true;
     dynamicResolution = true;
     outputFrame = true;

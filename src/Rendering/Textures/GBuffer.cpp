@@ -94,62 +94,9 @@ namespace Haboob
     litColourTarget.renderFrom(context);
   }
 
-  HRESULT GBuffer::capture(ID3D11Device* device, ID3D11DeviceContext* context, std::vector<Byte>& buffer, UInt& width, UInt& height)
+  HRESULT GBuffer::capture(const std::wstring& path, ID3D11DeviceContext* context)
   {
-    HRESULT result = S_OK;
-
-    auto texture = litColourTarget.getTexture();
-
-    ComPtr<ID3D11Texture2D> stageTexture;
-    {
-      D3D11_TEXTURE2D_DESC stageTextureDesc;
-      texture->GetDesc(&stageTextureDesc);
-
-      width = stageTextureDesc.Width;
-      height = stageTextureDesc.Height;
-
-      stageTextureDesc.MipLevels = 1;
-      stageTextureDesc.BindFlags = 0;
-      stageTextureDesc.Usage = D3D11_USAGE_STAGING;
-      stageTextureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-
-      result = device->CreateTexture2D(&stageTextureDesc, NULL, stageTexture.ReleaseAndGetAddressOf());
-    }
-    Firebreak(result);
-
-    D3D11_BOX sourceRegion;
-    sourceRegion.left = 0;
-    sourceRegion.right = width;
-    sourceRegion.top = 0;
-    sourceRegion.bottom = height;
-    sourceRegion.front = 0;
-    sourceRegion.back = 1;
-
-    context->CopySubresourceRegion(stageTexture.Get(), 0, 0, 0, 0, texture, 0, &sourceRegion);
-
-    D3D11_MAPPED_SUBRESOURCE mapped;
-    result = context->Map(stageTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped);
-
-    if (mapped.pData)
-    {
-      UInt rowSize = width * 8;
-      buffer.resize(rowSize * height);
-
-      // Copy the image row by row (D3D uses padding)
-      Byte* srcProgress = (Byte*)mapped.pData;
-      Byte* dstProgress = buffer.data();
-      for (size_t i = 0; i < height; ++i)
-      {
-        std::memcpy(dstProgress, srcProgress, rowSize);
-
-        dstProgress += rowSize;
-        srcProgress += mapped.RowPitch;
-      }
-    }
-
-    context->Unmap(stageTexture.Get(), 0);
-
-    return result;
+    return DirectX::SaveDDSTextureToFile(context, litColourTarget.getTexture(), path.c_str());
   }
 
   HRESULT ToneMapShader::initShader(ID3D11Device* device, ShaderManager* manager)

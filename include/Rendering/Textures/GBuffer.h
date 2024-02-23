@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderTarget.h"
+#include "Rendering/ScreenGrab11.h"
 namespace Haboob
 {
   // Reinhard tone mapping from HDR to LDR
@@ -58,8 +59,8 @@ namespace Haboob
     // Renders to another target using the lit texture
     void renderFromLit(ID3D11DeviceContext* context);
 
-    // Captures the lit buffer to CPU
-    HRESULT capture(ID3D11Device* device, ID3D11DeviceContext* context, std::vector<Byte>& buffer, UInt& width, UInt& height); // VERY SLOW
+    // Captures the lit buffer to file
+    HRESULT capture(const std::wstring& path, ID3D11DeviceContext* context); // VERY SLOW
 
     inline RenderTarget& getLitColourTarget() { return litColourTarget; }
 

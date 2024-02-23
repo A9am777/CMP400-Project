@@ -26,10 +26,18 @@ function(exportScripts target)
          VERBATIM)
    endforeach()
 
-   set(PROFILER_PATH "${CMAKE_CURRENT_LIST_DIR}/../Tracy-0.10" CACHE STRING "The path to the profiler application")
+   set(PROFILER_PATH "${CMAKE_CURRENT_LIST_DIR}/../Tracy-0.10" CACHE STRING "The path to the profiler applications")
    add_custom_command(TARGET ${target}
          POST_BUILD
          COMMAND IF NOT EXIST "${trueOutputDir}/Profiler " mklink /J "${trueOutputDir}/Profiler " "${PROFILER_PATH} "
+         MAIN_DEPENDENCY ${script}
+         COMMENT "EXPORTSCRIPTS COPY ${script}"
+         WORKING_DIRECTORY ${trueCopyDir}
+         VERBATIM)
+   set(DXTEX_PATH "${CMAKE_CURRENT_LIST_DIR}/../DirectXTex" CACHE STRING "The path to the texture processing applications")
+   add_custom_command(TARGET ${target}
+         POST_BUILD
+         COMMAND IF NOT EXIST "${trueOutputDir}/DXT " mklink /J "${trueOutputDir}/DXT " "${DXTEX_PATH} "
          MAIN_DEPENDENCY ${script}
          COMMENT "EXPORTSCRIPTS COPY ${script}"
          WORKING_DIRECTORY ${trueCopyDir}
