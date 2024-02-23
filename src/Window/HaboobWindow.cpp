@@ -152,6 +152,13 @@ namespace Haboob
   {
     imguiEnd();
     TracyD3D11Destroy(tcyCtx);
+
+    // Ugly hack because Tracy will always block and the only
+    // functionality required is graceful *existing* socket closure
+    if (!TracyIsConnected)
+    {
+      TerminateProcess(GetCurrentProcess(), 0);
+    }
   }
 
   void HaboobWindow::onResize()
