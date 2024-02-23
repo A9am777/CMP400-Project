@@ -24,17 +24,17 @@ namespace Haboob
   void HaboobWindow::onStart()
   {
     Window::onStart();
-    createD3D();
-    imguiStart();
-
-    tcyCtx = TracyD3D11Context(device.getDevice().Get(), device.getContext().Get());
 
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
 
     env->getRoot().reflectVariables();
 
-    exportLocation = CURRENT_DIRECTORY + L"/../" + exportLocation;
+    if (exportPathFlag && exportPathFlag->HasFlag() && exportPathFlag->Matched())
+    {
+      std::string exportSmallPath = exportPathFlag->Get();
+      exportLocation = CURRENT_DIRECTORY + L"/../" + std::wstring(exportSmallPath.begin(), exportSmallPath.end());
+    }
 
     if (!showWindow)
     {
@@ -42,6 +42,10 @@ namespace Haboob
       std::cout << "Display window hidden\n";
     }
 
+    createD3D();
+    imguiStart();
+
+    tcyCtx = TracyD3D11Context(device.getDevice().Get(), device.getContext().Get());
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, requiredWidth, requiredHeight);
@@ -453,7 +457,7 @@ namespace Haboob
     exportLocation = L"test.dds";
     showWindow = true;
     dynamicResolution = true;
-    outputFrame = true;
+    outputFrame = false;
     exitAfterFrame = false;
     showGUI = true;
     requiredWidth = 256;
@@ -499,6 +503,25 @@ namespace Haboob
     {
       auto testGroup = (new EnvironmentGroup(new args::Group(argRoot, "Profiling"), false))->setName("Profiler");
       root.addChildGroup(testGroup);
+
+      // Flags
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*testGroup->getArgGroup(), "ShowWindow", "Toggles window display", { "sw" }), &showWindow)));
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*testGroup->getArgGroup(), "OutputFrame", "Requests a frame to be saved to file", { "of" }), &outputFrame)));
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*testGroup->getArgGroup(), "ExitFrame", "Exits after a single frame", { "eaf" }), &exitAfterFrame)));
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*testGroup->getArgGroup(), "ShowGUI", "Toggles the GUI", { "sg" }), &showGUI)));
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Int,
+        new args::ValueFlag<int>(*testGroup->getArgGroup(), "Width", "The display width", { "w" }), &requiredWidth)));
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Int,
+        new args::ValueFlag<int>(*testGroup->getArgGroup(), "Height", "The display width", { "h" }), &requiredHeight)));
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*testGroup->getArgGroup(), "DynamicResolution", "Should resolution be dynamic", { "dr" }), &dynamicResolution)));
+
+      exportPathFlag = new args::ValueFlag<std::string>(*testGroup->getArgGroup(), "Output", "The output path", { "o" });
+      testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Symbolic, exportPathFlag)));
 
       // Await the external profiler before continuing
       testGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Symbolic, new args::ActionFlag(*testGroup->getArgGroup(), "AwaitProfiler", "The application should pause until the profiler connects", { "ap" }, [=]()

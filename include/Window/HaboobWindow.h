@@ -77,6 +77,7 @@ namespace Haboob
     tracy::D3D11Ctx* tcyCtx;
 
     // Top level args
+    args::ValueFlag<std::string>* exportPathFlag;
     std::wstring exportLocation;
     bool showWindow; // Window should be displayed
     bool dynamicResolution; // Scale with window?
