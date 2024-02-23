@@ -10,4 +10,11 @@ echo Sample Count of... 4?!
 "Haboobo.exe" --it=4 --sw=0 --of=1 --eaf=1 --sg=0 --w=1024 --h=1024 --dr=0 --o="AbsurdlyLowSample.dds"
 "DXT/texconv.exe" "AbsurdlyLowSample.dds" -ft png -srgbo -y -wiclossless
 
+echo Test Low to Ground
+python PyCompareToolApp.py LowSample.png GroundTruth.png
+
+
+echo Test Very Low to Ground
+python PyCompareToolApp.py AbsurdlyLowSample.png GroundTruth.png
+
 cmd /k

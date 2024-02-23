@@ -1,12 +1,16 @@
 # Copy relevant scripts to the build directory
 
 set(trueCopyDir "${CMAKE_CURRENT_LIST_DIR}/Exports")
-getDirFiles(ExportScripts "${trueCopyDir}" "CMFT_SCRIPT_batch" 1)
+getDirFiles(ExportBatScripts "${trueCopyDir}" "CMFT_SCRIPT_batch" 1)
+getDirFiles(ExportPyScripts "${trueCopyDir}" "CMFT_SCRIPT_python" 1)
 
-logInf(${ExportScripts})
+logInf("${ExportBatScripts}")
+logInf("${ExportPyScripts}")
 function(exportScripts target)
    # Shorthands
    set(trueOutputDir "$<TARGET_FILE_DIR:${target}>")
+
+   set(ExportScripts ${ExportBatScripts};${ExportPyScripts})
 
    foreach(script ${ExportScripts})
       getPureFilename(${script} scriptFilename)
