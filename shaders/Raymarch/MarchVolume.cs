@@ -214,7 +214,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   float angularDistance = dot(ray.dir.xyz, -light.direction.xyz);
   float4 incomingForwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicForwardTerms) * float4(light.diffuse, light.diffuse.r);
   float4 incomingBackwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicBackwardTerms) * float4(light.diffuse, light.diffuse.r);
-  float4 ambientIrradiance = float4(light.ambient, light.ambient.r);
+  float4 ambientIrradiance = opticalInfo.ambientFraction * float4(light.ambient, light.ambient.r) * Phase(1., opticalInfo.anisotropicForwardTerms);
   
   Integrator absorptionInte = { 0, 0, 0, 0, 0 }; // Keep distinct from transmission
   // Spectral CIE X1YZX2

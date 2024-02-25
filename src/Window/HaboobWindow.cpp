@@ -498,7 +498,7 @@ namespace Haboob
   {
     // Important configs
     exportLocation = L"test.dds";
-    showWindow = false;
+    showWindow = true;
     dynamicResolution = true;
     outputFrame = false;
     exitAfterFrame = false;
@@ -512,7 +512,7 @@ namespace Haboob
     mainCamera.getAngles() = { 1.36f, .1f, .0f };
 
     // Camera orbit (frame locked)
-    cameraOrbit = true;
+    cameraOrbit = false;
     orbitLookAt = { 0, 0, 0 };
     orbitAxis = { .0f, 1.f, 1.f };
     orbitRadius = 10.f;
@@ -534,9 +534,10 @@ namespace Haboob
 
       opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
       opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
-      opticsInfo.phaseBlendWeightTerms = { .09f, .09f, .09f, .09f, };
+      opticsInfo.phaseBlendWeightTerms = { .2f, .2f, .2f, .2f, };
       opticsInfo.scatterAngstromExponent = 3.1f;
 
+      opticsInfo.ambientFraction = { .8f, .8f, .8f, .8f, };
       opticsInfo.absorptionAngstromExponent = 2.1f;
       opticsInfo.powderCoefficient = .035f;
       opticsInfo.attenuationFactor = 12.1f;
@@ -771,6 +772,9 @@ namespace Haboob
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.attenuationFactor))
         ->setName("Attenuation scale")
         ->setGUISettings(1.f, .0f, 100.f));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float4, nullptr, &opticsInfo.ambientFraction.x))
+        ->setName("Ambient fraction")
+        ->setGUISettings(.01f, .0f, 1.f));
 
       // Flags
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplyBeer))

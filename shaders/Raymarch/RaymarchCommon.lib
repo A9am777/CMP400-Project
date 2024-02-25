@@ -28,8 +28,8 @@ struct BasicOptics
   float4x4 spectralWavelengths; // Wavelengths to integrate over
   float4x4 spectralWeights; // Spectral integration weights
   
-  float referenceWavelength;
-  uint3 padding;
+  float4 ambientFraction;
+  uint4 flags;
 };
 
 struct MarchParams

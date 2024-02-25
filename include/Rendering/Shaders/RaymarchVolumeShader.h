@@ -29,10 +29,11 @@ namespace Haboob
     XMFLOAT4X4 spectralWavelengths; // Wavelengths to integrate over
     XMFLOAT4X4 spectralWeights; // Spectral integration weights
 
-    float referenceWavelength;
+    XMFLOAT4 ambientFraction;
     UINT flagApplyBeer = 1; // Controls whether to apply Beer-Lambert attenuation
     UINT flagApplyHG = 1; // Controls whether to apply the HG phase function
     UINT flagApplySpectral = 1; // Controls whether to integrate over several wavelengths
+    UINT flagUnused = 1;
   };
 
   struct ComprehensiveBufferInfo
