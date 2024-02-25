@@ -33,6 +33,8 @@ namespace Haboob
     
     void setupEnv(Environment* environment);
 
+    void show();
+
     virtual void onStart() override;
     virtual void main() override;
     virtual void onEnd() override;

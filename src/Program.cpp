@@ -35,6 +35,8 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  env.getRoot().reflectVariables();
+
   app.appContext(L"HaboobCMP400");
   app.create(L"Haboob", CW_USEDEFAULT, CW_USEDEFAULT);
   app.show();

@@ -28,18 +28,10 @@ namespace Haboob
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
     shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
 
-    env->getRoot().reflectVariables();
-
     if (exportPathFlag && exportPathFlag->HasFlag() && exportPathFlag->Matched())
     {
       std::string exportSmallPath = exportPathFlag->Get();
       exportLocation = CURRENT_DIRECTORY + L"/../" + std::wstring(exportSmallPath.begin(), exportSmallPath.end());
-    }
-
-    if (!showWindow)
-    {
-      ShowWindow(wHandle, SW_HIDE);
-      std::cout << "Display window hidden\n";
     }
 
     createD3D();
@@ -506,7 +498,7 @@ namespace Haboob
   {
     // Important configs
     exportLocation = L"test.dds";
-    showWindow = true;
+    showWindow = false;
     dynamicResolution = true;
     outputFrame = false;
     exitAfterFrame = false;
@@ -790,6 +782,17 @@ namespace Haboob
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplySpectral))
         ->setName("Apply Spectral")
         ->setGUISettings(~0));
+    }
+  }
+  void HaboobWindow::show()
+  {
+    if (showWindow)
+    {
+      Window::show();
+    }
+    else
+    {
+      std::cout << "Display window hidden\n";
     }
   }
 }
