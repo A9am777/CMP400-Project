@@ -171,6 +171,7 @@ namespace Haboob
         // Nothing, just symbolic
         break;
       case Type::Bool:
+        ImGui::Checkbox(name.c_str(), (bool*)destination);
         break;
       case Type::Float:
         ImGui::DragFloat(name.c_str(), (float*)destination, *(float*)guiSetting1, *(float*)guiSetting2, *(float*)guiSetting3);

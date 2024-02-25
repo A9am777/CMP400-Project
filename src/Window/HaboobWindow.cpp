@@ -45,6 +45,12 @@ namespace Haboob
     createD3D();
     imguiStart();
 
+    // Reflect discrete camera orbit to continuous
+    if (cameraOrbit && orbitDiscreteProgress)
+    {
+      orbitProgress = float(orbitDiscreteProgress) * orbitStep;
+    }
+
     tcyCtx = TracyD3D11Context(device.getDevice().Get(), device.getContext().Get());
     {
       auto dev = device.getDevice().Get();
@@ -240,6 +246,9 @@ namespace Haboob
 
     // If macros changed, recompile shaders!
     shaderManager.bakeMacros(device.getDevice().Get());
+
+    // Orbit the camera on the fixed path (overwrites input!)
+    cameraOrbitStep(dt);
   }
 
   void HaboobWindow::render()
@@ -458,6 +467,41 @@ namespace Haboob
     return gbuffer.capture(exportLocation, device.getContext().Get());
   }
 
+  void HaboobWindow::cameraOrbitStep(float dtConsidered)
+  {
+    if (!cameraOrbit) { return; }
+
+    // Pan around a circular orbit utilising parametric eq of circle
+    // Note: frame locked for consistent testing results
+
+    XMVECTOR lookAtLoad = XMLoadFloat3(&orbitLookAt);
+    XMVECTOR axisLoad = XMLoadFloat3(&orbitAxis);
+    
+    // Revolve
+    float xAxisMag = orbitRadius * std::cos(orbitProgress);
+    float yAxisMag = orbitRadius * std::sin(orbitProgress);
+
+    // Determine coordinate system
+    axisLoad = XMVector3Normalize(axisLoad);
+    XMVECTOR localXAxis = XMVector3Cross(XMVectorSet(.5f, .5f, .5f, 1.f), axisLoad);
+    localXAxis = XMVector3Normalize(localXAxis);
+    XMVECTOR localYAxis = XMVector3Cross(localXAxis, axisLoad);
+    localYAxis = XMVector3Normalize(localYAxis);
+
+    // Compute camera look at and position
+    XMVECTOR cameraPosition = XMVectorAdd(XMVectorScale(localXAxis, xAxisMag), XMVectorScale(localYAxis, yAxisMag));
+    cameraPosition = XMVectorAdd(axisLoad, cameraPosition);
+    XMVECTOR cameraForward = XMVectorSubtract(lookAtLoad, cameraPosition);
+
+    // Best to directly overwrite to avoid euler angle shenanigans
+    XMVECTOR up = XMVectorSet(.0f, 1.f, 0.f, 1.f);
+    XMStoreFloat3(&mainCamera.getPosition(), cameraPosition);
+    mainCamera.setView(XMMatrixLookToLH(cameraPosition, cameraForward, up));
+
+    // Only progress w.r.t. delta if we are looking (otherwise a testing-stable environment is necessary)
+    orbitProgress += showWindow ? orbitStep * dtConsidered : orbitStep;
+  }
+
   void HaboobWindow::setupDefaults()
   {
     // Important configs
@@ -474,6 +518,15 @@ namespace Haboob
     mainCamera.getMoveRate() = 6.f;
     mainCamera.getPosition() = { -8.42f, .93f, -1.41f };
     mainCamera.getAngles() = { 1.36f, .1f, .0f };
+
+    // Camera orbit (frame locked)
+    cameraOrbit = true;
+    orbitLookAt = { 0, 0, 0 };
+    orbitAxis = { .0f, 1.f, 1.f };
+    orbitRadius = 10.f;
+    orbitStep = .011f;
+    orbitProgress = .0f;
+    orbitDiscreteProgress = 0;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -558,6 +611,40 @@ namespace Haboob
       cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMouseSensitivity()))
         ->setName("Camera Look Speed")
         ->setGUISettings(1.f, .0f, .0f));
+
+
+      {
+        auto orbitGroup = (new EnvironmentGroup(new args::Group(argRoot, "Orbit")))->setName("Orbit");
+        cameraGroup->addChildGroup(orbitGroup);
+
+        orbitGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+          new args::ValueFlag<bool>(*orbitGroup->getArgGroup(), "ShouldOrbit", "Toggles camera orbiting", { "so" }), &cameraOrbit))
+          ->setName("Should Orbit"));
+        orbitGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float,
+          new args::ValueFlag<float>(*orbitGroup->getArgGroup(), "OrbitRadius", "Camera orbit radius", { "or" }), &orbitRadius))
+          ->setName("Orbit Radius")
+          ->setGUISettings(.1f, .0f, 10.f));
+        orbitGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float,
+          new args::ValueFlag<float>(*orbitGroup->getArgGroup(), "OrbitStep", "Camera orbit step per frame", { "os" }), &orbitStep))
+          ->setName("Orbit Step")
+          ->setGUISettings(.01f, -5.f, 5.f));
+        orbitGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &orbitLookAt))
+          ->setName("Orbit Look At")
+          ->setGUISettings(.1f, -10.f, 10.f));
+        orbitGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &orbitAxis))
+          ->setName("Orbit Axis")
+          ->setGUISettings(.1f, -10.f, 10.f));
+
+        // Hidden
+        orbitGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float,
+          new args::ValueFlag<float>(*orbitGroup->getArgGroup(), "OrbitProgress", "Camera orbit progression (float)", { "opf" }), &orbitProgress, false))
+          ->setName("Orbit Progress")
+          ->setGUISettings(.01f, .0f, 10.f));
+        orbitGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Int,
+          new args::ValueFlag<UInt>(*orbitGroup->getArgGroup(), "OrbitDiscreteProgress", "Camera orbit progression (int)", { "opi" }), &orbitDiscreteProgress, false))
+          ->setName("Orbit Discrete Progress")
+          ->setGUISettings(.01f, 0, 100));
+      }
     }
 
     {

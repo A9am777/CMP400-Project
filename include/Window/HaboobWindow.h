@@ -57,6 +57,9 @@ namespace Haboob
     // Captures the backbuffer and saves to file
     HRESULT exportFrame(); // Slow
 
+    // Steps the camera orbit
+    void cameraOrbitStep(float dtConsidered);
+
     // Strictly for testing purposes - forces the camera buffer to be resent
     void redoCameraBuffer(ID3D11DeviceContext* context);
 
@@ -87,6 +90,15 @@ namespace Haboob
     int requiredWidth;
     int requiredHeight;
 
+    // Camera orbit (frame locked)
+    bool cameraOrbit;
+    XMFLOAT3 orbitLookAt;
+    XMFLOAT3 orbitAxis;
+    float orbitRadius;
+    float orbitStep; // In rads
+    float orbitProgress; // In rads
+    int orbitDiscreteProgress; // Frames passed (external input)
+
     // Rendering device
     DisplayDevice device;
 
@@ -115,6 +127,7 @@ namespace Haboob
     // Reusable buffers
     ComPtr<ID3D11Buffer> cameraBuffer;
     ComPtr<ID3D11Buffer> lightBuffer;
+
     private:
     Clock::time_point lastFrame;
 
