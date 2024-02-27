@@ -59,6 +59,9 @@ namespace Haboob
         GBuffer::lightShader.initShader(dev, &shaderManager);
       }
 
+      scene.init(dev, &shaderManager);
+      scene.setCamera(&mainCamera);
+
       shaderManager.bakeMacros(dev);
       
       // Generate assets
@@ -66,26 +69,44 @@ namespace Haboob
         sphereMesh.build(dev);
         cubeMesh.build(dev);
         planeMesh.build(dev);
+        scene.addMesh("Sphere", &sphereMesh);
+        scene.addMesh("Cube", &cubeMesh);
+        scene.addMesh("Plane", &planeMesh);
 
         haboobVolume.rebuild(dev);
         haboobVolume.render(device.getContext().Get());
       }
 
+      // Set up scene objects
+      {
+        typedef MeshInstance<VertexType> Instance;
+        
+        Instance* instance = new Instance(&sphereMesh);
+        instance->getPosition() = { .0f, .0f, 2.5f };
+        scene.addObject(instance);
+
+        instance = new Instance(&planeMesh);
+        instance->getRotation() = { .707f, .0f, .0f, .707f };
+        instance->getPosition() = { .0f, -1.f, .0f };
+        instance->getScale() = { 5.f, 5.f, 1.f };
+        scene.addObject(instance);
+
+        instance = new Instance(&cubeMesh);
+        instance->getPosition() = { -2.f, 1.5f, .0f };
+        scene.addObject(instance);
+      }
+
       // Create buffers
       {
-        // Camera buffer
+        // Light buffer
         D3D11_BUFFER_DESC bufferDesc;
         HRESULT result = S_OK; // unused
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        bufferDesc.ByteWidth = sizeof(CameraPack);
+        bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         bufferDesc.MiscFlags = 0;
         bufferDesc.StructureByteStride = 0;
-        result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, cameraBuffer.ReleaseAndGetAddressOf());
-
-        // Light buffer
-        bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
         result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, lightBuffer.ReleaseAndGetAddressOf());
       }
     }
@@ -251,32 +272,8 @@ namespace Haboob
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // Render the opaque scene in a dirty way
-    deferredVertexShader->bindShader(context);
-    deferredPixelShader->bindShader(context);
-    {
-      context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
-      context->PSSetConstantBuffers(0, 1, lightBuffer.GetAddressOf());
-
-      mainCamera.setWorld(XMMatrixIdentity() * XMMatrixTranslation(spherePos[0], spherePos[1], spherePos[2]));
-      redoCameraBuffer(context);
-
-      sphereMesh.useBuffers(context);
-      sphereMesh.draw(context);
-
-      mainCamera.setWorld(XMMatrixScaling(5.f, 5.f, 1.f) * XMMatrixLookToLH(XMVectorZero(), XMVectorSet(.0f, 1.f, .0f, 1.f), XMVectorSet(.0f, .0f, -1.f, 1.f)) * XMMatrixTranslation(.0f, -1.f, .0f));
-      redoCameraBuffer(context);
-
-      planeMesh.useBuffers(context);
-      planeMesh.draw(context);
-
-      mainCamera.setWorld(XMMatrixTranslation(-2.f, 1.5f, .0f));
-      redoCameraBuffer(context);
-
-      cubeMesh.useBuffers(context);
-      cubeMesh.draw(context);
-    }
-    deferredVertexShader->unbindShader(context);
-    deferredPixelShader->unbindShader(context);
+    context->PSSetConstantBuffers(0, 1, lightBuffer.GetAddressOf());
+    scene.draw(context);
   }
 
   void HaboobWindow::createD3D()
@@ -306,17 +303,6 @@ namespace Haboob
   LRESULT HaboobWindow::customRoutine(UINT message, WPARAM wParam, LPARAM lParam)
   {
     return ImGui_ImplWin32_WndProcHandler(wHandle, message, wParam, lParam);
-  }
-
-  void HaboobWindow::redoCameraBuffer(ID3D11DeviceContext* context)
-  {
-    // Camera data
-    {
-      D3D11_MAPPED_SUBRESOURCE mapped;
-      HRESULT result = context->Map(cameraBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-      mainCamera.putPack(mapped.pData);
-      context->Unmap(cameraBuffer.Get(), 0);
-    }
   }
 
   void HaboobWindow::renderBegin()
@@ -355,7 +341,7 @@ namespace Haboob
     // Basic lit pass
     gbuffer.lightPass(context, lightBuffer.Get());
 
-    raymarchShader.setCameraBuffer(cameraBuffer);
+    raymarchShader.setCameraBuffer(scene.getCameraBuffer());
     raymarchShader.setLightBuffer(lightBuffer);
     raymarchShader.setTarget(&gbuffer.getLitColourTarget());
 
@@ -450,6 +436,8 @@ namespace Haboob
         haboobVolume.rebuild(device.getDevice().Get());
         haboobVolume.render(device.getContext().Get());
       }
+
+      scene.imguiSceneTree();
     }
     ImGui::End();
   }
