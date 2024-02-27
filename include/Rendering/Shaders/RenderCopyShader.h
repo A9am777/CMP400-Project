@@ -14,7 +14,7 @@ namespace Haboob
     RenderCopyShader();
     ~RenderCopyShader();
 
-    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context);
 
     void render(ID3D11DeviceContext* context) const;

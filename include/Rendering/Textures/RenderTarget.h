@@ -26,13 +26,13 @@ namespace Haboob
     inline ID3D11RenderTargetView* getRenderTarget() { return textureTarget.Get(); }
     inline ID3D11ShaderResourceView* getShaderView() { return textureShaderView.Get(); }
     inline ID3D11UnorderedAccessView* getComputeView() { return computeAccessView.Get(); }
+    inline ID3D11Texture2D* getTexture() { return texture.Get(); }
 
+    static D3D11_TEXTURE2D_DESC defaultTextureDesc;
     static RenderCopyShader copyShader;
     static float defaultBlack[4];
     static float defaultWhite[4];
     static float defaultRed[4];
-    protected:
-    static D3D11_TEXTURE2D_DESC defaultTextureDesc;
 
     private:
     ComPtr<ID3D11Texture2D> texture;

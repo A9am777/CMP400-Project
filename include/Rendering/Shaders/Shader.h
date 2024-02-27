@@ -1,10 +1,11 @@
 #pragma once
 #include "Rendering/D3DCore.h"
 #include "Rendering/DisplayDevice.h"
-#include "ShaderManager.h"
 
 namespace Haboob
 {
+  class ShaderManager;
+
   class Shader
   {
     public:
@@ -19,10 +20,11 @@ namespace Haboob
       COUNT
     };
 
-    Shader(Type shaderType, const wchar_t* path);
+    Shader(Type shaderType, const wchar_t* path, bool precompiled = false);
     ~Shader();
 
     HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context);
     void unbindShader(ID3D11DeviceContext* context);
     static void dispatch(ID3D11DeviceContext* context, UInt groupX = 1, UInt groupY = 1, UInt groupZ = 1);
@@ -48,6 +50,7 @@ namespace Haboob
     private:
     Type type;
     const wchar_t* relativePath;
+    bool preferCompiled;
     ComPtr<ID3D11InputLayout> inputLayout; // Vertex descriptor
     ID3D11DeviceChild* compiledShader;
   };

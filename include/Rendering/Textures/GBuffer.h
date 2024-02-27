@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderTarget.h"
+#include "Rendering/ScreenGrab11.h"
 namespace Haboob
 {
   // Reinhard tone mapping from HDR to LDR
@@ -9,7 +10,7 @@ namespace Haboob
     public:
     ToneMapShader() : Shader(Shader::Type::Compute, L"Lighting/ToneMap") {}
 
-    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context, ID3D11UnorderedAccessView* uav);
     void bindShader(ID3D11DeviceContext* context) = delete;
     void unbindShader(ID3D11DeviceContext* context);
@@ -57,6 +58,9 @@ namespace Haboob
     void finalLitPass(ID3D11DeviceContext* context);
     // Renders to another target using the lit texture
     void renderFromLit(ID3D11DeviceContext* context);
+
+    // Captures the lit buffer to file
+    HRESULT capture(const std::wstring& path, ID3D11DeviceContext* context); // VERY SLOW
 
     inline RenderTarget& getLitColourTarget() { return litColourTarget; }
 

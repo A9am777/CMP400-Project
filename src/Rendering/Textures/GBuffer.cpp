@@ -1,3 +1,4 @@
+#include "Rendering/Shaders/ShaderManager.h"
 #include "Rendering/Textures/GBuffer.h"
 
 namespace Haboob
@@ -24,7 +25,7 @@ namespace Haboob
   {
     static float normalClearColour[4] = { .0f, .0f, -1.f, .0f };
 
-    diffuseTarget.clear(context, RenderTarget::defaultWhite);
+    diffuseTarget.clear(context, RenderTarget::defaultBlack);
     normalDepthTarget.clear(context, normalClearColour);
     litColourTarget.clear(context, RenderTarget::defaultBlack);
   }
@@ -93,7 +94,12 @@ namespace Haboob
     litColourTarget.renderFrom(context);
   }
 
-  HRESULT ToneMapShader::initShader(ID3D11Device* device, const ShaderManager* manager)
+  HRESULT GBuffer::capture(const std::wstring& path, ID3D11DeviceContext* context)
+  {
+    return DirectX::SaveDDSTextureToFile(context, litColourTarget.getTexture(), path.c_str());
+  }
+
+  HRESULT ToneMapShader::initShader(ID3D11Device* device, ShaderManager* manager)
   {
     HRESULT result = S_OK;
     

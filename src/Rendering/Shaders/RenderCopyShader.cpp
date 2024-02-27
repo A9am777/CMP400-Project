@@ -1,3 +1,4 @@
+#include "Rendering/Shaders/ShaderManager.h"
 #include "Rendering/Shaders/RenderCopyShader.h"
 
 namespace Haboob
@@ -18,7 +19,7 @@ namespace Haboob
     delete pixelShader; pixelShader = nullptr;
   }
 
-  HRESULT RenderCopyShader::initShader(ID3D11Device* device, const ShaderManager* manager)
+  HRESULT RenderCopyShader::initShader(ID3D11Device* device, ShaderManager* manager)
   {
     HRESULT result = S_OK;
 

@@ -4,15 +4,19 @@
 #include <VKeys.h>
 #include <MousePointer.h>
 #include <imgui.h>
+#include "Data/EnvironmentArgs.h"
 #include "Rendering/D3DCore.h"
 #include "Rendering/DisplayDevice.h"
-#include "Rendering/Shaders/Shader.h"
+#include "Rendering/Shaders/ShaderManager.h"
 #include "Rendering/Geometry/SimpleMeshes.h"
 #include "Rendering/Scene/FreeCam.h"
 #include "Rendering/Lighting/LightStructs.h"
 #include "Rendering/Textures/RenderTarget.h"
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
 #include "Rendering/Textures/GBuffer.h"
+
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyD3D11.hpp>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -26,6 +30,10 @@ namespace Haboob
     public:
     HaboobWindow();
     ~HaboobWindow();
+    
+    void setupEnv(Environment* environment);
+
+    void show();
 
     virtual void onStart() override;
     virtual void main() override;
@@ -46,6 +54,14 @@ namespace Haboob
 
     LRESULT customRoutine(UINT message, WPARAM wParam, LPARAM lParam) override;
 
+    void setupDefaults();
+
+    // Captures the backbuffer and saves to file
+    HRESULT exportFrame(); // Slow
+
+    // Steps the camera orbit
+    void cameraOrbitStep(float dtConsidered);
+
     // Strictly for testing purposes - forces the camera buffer to be resent
     void redoCameraBuffer(ID3D11DeviceContext* context);
 
@@ -60,6 +76,30 @@ namespace Haboob
     void imguiFrameResize();
 
     void renderGUI();
+
+    // Environment
+    Environment* env;
+    tracy::D3D11Ctx* tcyCtx;
+
+    // Top level args
+    args::ValueFlag<std::string>* exportPathFlag;
+    std::wstring exportLocation;
+    bool showWindow; // Window should be displayed
+    bool dynamicResolution; // Scale with window?
+    bool outputFrame; // Saves image to file
+    bool exitAfterFrame; // Exits after the first frame
+    bool showGUI;
+    int requiredWidth;
+    int requiredHeight;
+
+    // Camera orbit (frame locked)
+    bool cameraOrbit;
+    XMFLOAT3 orbitLookAt;
+    XMFLOAT3 orbitAxis;
+    float orbitRadius;
+    float orbitStep; // In rads
+    float orbitProgress; // In rads
+    int orbitDiscreteProgress; // Frames passed (external input)
 
     // Rendering device
     DisplayDevice device;
@@ -89,6 +129,7 @@ namespace Haboob
     // Reusable buffers
     ComPtr<ID3D11Buffer> cameraBuffer;
     ComPtr<ID3D11Buffer> lightBuffer;
+
     private:
     Clock::time_point lastFrame;
 

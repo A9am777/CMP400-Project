@@ -4,4 +4,12 @@
 // Remove the need to transpose
 #pragma pack_matrix( row_major )
 
+#define IDENTITY_MAT float4x4(1., .0, .0, .0, .0, 1., .0, .0, .0, .0, 1., .0, .0, .0, .0, 1.)
+#define ONE_MAT float4x4(1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.)
+#define FILL_MAT(n) float4x4(n, n, n, n, n, n, n, n, n, n, n, n, n, n, n, n)
+
+#define ONE_VEC float4(1., 1., 1., 1.)
+#define ZERO_VEC float4(.0, .0, .0, .0)
+#define FILL_VEC(n) float4(n, n, n, n)
+
 #endif

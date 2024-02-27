@@ -1,3 +1,4 @@
+#include "Rendering/Shaders/ShaderManager.h"
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
 
 namespace Haboob
@@ -14,7 +15,7 @@ namespace Haboob
     delete computeShader; computeShader = nullptr;
   }
 
-  HRESULT RaymarchVolumeShader::initShader(ID3D11Device* device, const ShaderManager* manager)
+  HRESULT RaymarchVolumeShader::initShader(ID3D11Device* device, ShaderManager* manager)
   {
     HRESULT result = S_OK;
 
@@ -156,14 +157,14 @@ namespace Haboob
 
   VolumeGenerationShader::VolumeGenerationShader()
   {
-    generateVolumeShader = new Shader(Shader::Type::Compute, L"TestShaders/TestFormHaboob");
+    generateVolumeShader = new Shader(Shader::Type::Compute, L"TestShaders/TestFormHaboob", true);
   }
 
   VolumeGenerationShader::~VolumeGenerationShader()
   {
     delete generateVolumeShader; generateVolumeShader = nullptr;
   }
-  HRESULT VolumeGenerationShader::initShader(ID3D11Device* device, const ShaderManager* manager)
+  HRESULT VolumeGenerationShader::initShader(ID3D11Device* device, ShaderManager* manager)
   {
     HRESULT result = S_OK;
 

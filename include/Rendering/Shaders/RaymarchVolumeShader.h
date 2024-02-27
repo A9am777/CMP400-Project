@@ -29,10 +29,11 @@ namespace Haboob
     XMFLOAT4X4 spectralWavelengths; // Wavelengths to integrate over
     XMFLOAT4X4 spectralWeights; // Spectral integration weights
 
-    UINT flagApplyBeer; // Controls whether to apply Beer-Lambert attenuation
-    UINT flagApplyHG; // Controls whether to apply the HG phase function
-    UINT flagApplySpectral; // Controls whether to integrate over several wavelengths
-    float referenceWavelength;
+    XMFLOAT4 ambientFraction;
+    UINT flagApplyBeer = 1; // Controls whether to apply Beer-Lambert attenuation
+    UINT flagApplyHG = 1; // Controls whether to apply the HG phase function
+    UINT flagApplySpectral = 1; // Controls whether to integrate over several wavelengths
+    UINT flagUnused = 1;
   };
 
   struct ComprehensiveBufferInfo
@@ -67,7 +68,7 @@ namespace Haboob
     VolumeGenerationShader();
     ~VolumeGenerationShader();
 
-    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     HRESULT rebuild(ID3D11Device* device); // Creates texture from params
     void render(ID3D11DeviceContext* context); // Renders to the texture according to specifications
 
@@ -96,7 +97,7 @@ namespace Haboob
     RaymarchVolumeShader();
     ~RaymarchVolumeShader();
 
-    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource);
     void unbindShader(ID3D11DeviceContext* context);
 
