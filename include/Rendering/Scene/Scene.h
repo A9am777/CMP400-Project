@@ -21,7 +21,7 @@ namespace Haboob
     void addObject(MeshInstance<VertexType>* instance);
 
     HRESULT init(ID3D11Device* device, ShaderManager* manager);
-    void draw(ID3D11DeviceContext* context);
+    void draw(ID3D11DeviceContext* context, bool usePixel = true);
 
     ComPtr<ID3D11Buffer>& getCameraBuffer() { return cameraBuffer; }
 
@@ -33,7 +33,6 @@ namespace Haboob
     private:
     // Reusable buffers
     ComPtr<ID3D11Buffer> cameraBuffer;
-    ComPtr<ID3D11Buffer> lightBuffer;
 
     Camera defaultCam;
     Camera* cameraContext = &defaultCam;

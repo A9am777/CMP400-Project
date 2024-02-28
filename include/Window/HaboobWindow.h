@@ -15,6 +15,7 @@
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
 #include "Rendering/Textures/GBuffer.h"
 #include "Rendering/Scene/Scene.h"
+#include "Rendering/Lighting/LightSource.h"
 
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyD3D11.hpp>
@@ -114,7 +115,7 @@ namespace Haboob
 
     // Scene objects
     Scene scene;
-    DirectionalLightPack dirLightPack;
+    Light light;
     FreeCam mainCamera;
     
     Shader* deferredVertexShader;
@@ -124,9 +125,6 @@ namespace Haboob
     GBuffer gbuffer;
     RaymarchVolumeShader raymarchShader;
     ShaderManager shaderManager;
-    
-    // Reusable buffers
-    ComPtr<ID3D11Buffer> lightBuffer;
 
     private:
     Clock::time_point lastFrame;

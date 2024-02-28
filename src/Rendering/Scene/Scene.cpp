@@ -50,16 +50,12 @@ namespace Haboob
       bufferDesc.MiscFlags = 0;
       bufferDesc.StructureByteStride = 0;
       result = device->CreateBuffer(&bufferDesc, NULL, cameraBuffer.ReleaseAndGetAddressOf());
-
-      // Light buffer
-      bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
-      result = device->CreateBuffer(&bufferDesc, NULL, lightBuffer.ReleaseAndGetAddressOf());
     }
 
     return result;
   }
 
-  void Scene::draw(ID3D11DeviceContext* context)
+  void Scene::draw(ID3D11DeviceContext* context, bool usePixel)
   {
     meshRenderer.setUploadTransformFunc([=](const XMMATRIX& newTransform) 
     {
@@ -75,6 +71,10 @@ namespace Haboob
     // Render all mesh instances
     meshRenderer.start();
     meshRenderer.bind(context);
+    if (!usePixel)
+    {
+      context->PSSetShader(nullptr, nullptr, 0);
+    }
     for (auto instance : meshInstances)
     {
       instance->buildTransform();
