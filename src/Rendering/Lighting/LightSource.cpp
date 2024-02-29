@@ -9,17 +9,18 @@ namespace Haboob
     farZ = 15.f;
     ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
 
-    renderPosition = { .0f, .0f, -1.0f };
+    renderPosition = { .0f, 4.f, .0f };
   }
 
   HRESULT Light::create(ID3D11Device* device, UInt width, UInt height)
   {
     HRESULT result = S_OK;
 
-    // Create light buffer
+    // Create buffers
     {
       D3D11_BUFFER_DESC bufferDesc;
 
+      // Create light buffer
       bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
       bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
       bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -27,8 +28,32 @@ namespace Haboob
       bufferDesc.MiscFlags = 0;
       bufferDesc.StructureByteStride = 0;
       result = device->CreateBuffer(&bufferDesc, NULL, lightBuffer.ReleaseAndGetAddressOf());
+
+      // Camera buffer
+      bufferDesc.ByteWidth = sizeof(CameraPack);
+      result = device->CreateBuffer(&bufferDesc, NULL, cameraBuffer.ReleaseAndGetAddressOf());
     }
-    Firebreak(result)
+    Firebreak(result);
+
+    // Create the shadow sampler
+    {
+      D3D11_SAMPLER_DESC samplerDesc;
+      ZeroMemory(&samplerDesc, sizeof(D3D11_SAMPLER_DESC));
+
+      samplerDesc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+      samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+      samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+      samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+      samplerDesc.MipLODBias = 0.0f;
+      samplerDesc.MaxAnisotropy = 1;
+      samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+      samplerDesc.MinLOD = 0;
+      samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+      // Create the texture sampler state.
+      result = device->CreateSamplerState(&samplerDesc, sampler.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
 
     resize(device, width, height);
     Firebreak(result);
@@ -91,6 +116,7 @@ namespace Haboob
 
     // Create the viewport
     {
+      viewport.TopLeftX = viewport.TopLeftY = .0f;
       viewport.Width = float(width);
       viewport.Height = float(height);
       viewport.MinDepth = .0f;
@@ -111,14 +137,14 @@ namespace Haboob
     context->RSSetViewports(1, &viewport);
   }
 
-  HRESULT Light::rebuildLightBuffer(ID3D11DeviceContext* context)
+  HRESULT Light::rebuildLightBuffers(ID3D11DeviceContext* context)
   {
     HRESULT result = S_OK;
 
     // Light data
     {
       D3D11_MAPPED_SUBRESOURCE mapped;
-      HRESULT result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+      result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
       std::memcpy(mapped.pData, &lightPack, sizeof(DirectionalLightPack));
 
       // Normalise direction before sending
@@ -129,19 +155,27 @@ namespace Haboob
       context->Unmap(lightBuffer.Get(), 0);
     }
 
+    // Camera data
+    {
+      D3D11_MAPPED_SUBRESOURCE mapped;
+      result = context->Map(cameraBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+      camera.putPack(mapped.pData);
+      context->Unmap(cameraBuffer.Get(), 0);
+    }
+
     return result;
   }
 
   void Light::updateCameraView()
   {
     XMVECTOR positionLoad = XMLoadFloat3(&renderPosition);
+    XMVECTOR upLoad = XMVectorSet(.0f, 1.f, .0f, 1.f);
+    upLoad = XMVector3Normalize(upLoad);
     XMVECTOR forwardLoad = XMLoadFloat4(&lightPack.direction);
     forwardLoad = XMVector3Normalize(forwardLoad);
-    XMVECTOR upBias = XMVectorSet(.0f, 1.f, .0f, 1.f);
-    XMVECTOR rightLoad = XMVector3Cross(forwardLoad, upBias);
-    XMVECTOR upLoad = XMVector3Cross(rightLoad, forwardLoad);
 
-    camera.setView(XMMatrixLookToLH(positionLoad, forwardLoad, upLoad));
+    // TODO: for some reason this doesn't exactly work
+    //camera.setView(XMMatrixLookToLH(positionLoad, forwardLoad, upLoad));
   }
 
 }

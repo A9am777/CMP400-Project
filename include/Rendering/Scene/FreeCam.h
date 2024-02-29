@@ -12,6 +12,7 @@ namespace Haboob
 
     void update(float dt, WSTR::VKeys* keys, WSTR::MousePointer* mouse);
 
+    inline const XMFLOAT3& getPosition() const { return position; }
     inline XMFLOAT3& getPosition() { return position; }
     inline XMFLOAT3& getAngles() { return eulerAngles; }
     inline float& getMoveRate() { return moveRate; }

@@ -89,7 +89,7 @@ namespace Haboob
         instance = new Instance(&planeMesh);
         instance->getRotation() = { .707f, .0f, .0f, .707f };
         instance->getPosition() = { .0f, -1.f, .0f };
-        instance->getScale() = { 5.f, 5.f, 1.f };
+        instance->getScale() = { 50.f, 50.f, 1.f };
         scene.addObject(instance);
 
         instance = new Instance(&cubeMesh);
@@ -244,6 +244,8 @@ namespace Haboob
       shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
     }
 
+    shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
+
     // If macros changed, recompile shaders!
     shaderManager.bakeMacros(device.getDevice().Get());
 
@@ -288,7 +290,8 @@ namespace Haboob
     // Render to the main target using vanilla settings
     device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
     device.setDepthEnabled(true);
-    light.rebuildLightBuffer(device.getContext().Get());
+    light.updateCameraView();
+    light.rebuildLightBuffers(device.getContext().Get());
     device.clearBackBuffer();
     gbuffer.clear(device.getContext().Get());
     gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
@@ -302,8 +305,8 @@ namespace Haboob
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // Shadowmap pass
+    light.rebuildLightBuffers(device.getContext().Get());
     light.setTarget(context);
-    light.updateCameraView();
     scene.setCamera(&light.getCamera());
     scene.draw(context, false);
 
@@ -323,8 +326,9 @@ namespace Haboob
     auto context = device.getContext().Get();
 
     // Basic lit pass
-    gbuffer.lightPass(context, light.getLightBuffer().Get());
+    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), light.getShadowSampler().Get());
 
+    scene.setCamera(&mainCamera);
     raymarchShader.setCameraBuffer(scene.getCameraBuffer());
     raymarchShader.setLightBuffer(light.getLightBuffer());
     raymarchShader.setTarget(&gbuffer.getLitColourTarget());
@@ -501,7 +505,7 @@ namespace Haboob
       auto& lightPack = light.getLightData();
       lightPack.diffuse = { 3.96f, 3.92f, 3.14f };
       lightPack.ambient = { 0.96f, 0.92f, 0.14f };
-      lightPack.direction = { -1.f, .25f, .0f, 1.f };
+      lightPack.direction = { .0f, -1.0f, -0.09f, 1.f };
     }
 
     // Raymarch params
@@ -519,7 +523,7 @@ namespace Haboob
       opticsInfo.attenuationFactor = 12.1f;
     }
 
-    raymarchShader.getMarchInfo().iterations = 26;
+    raymarchShader.getMarchInfo().iterations = 1;
   }
 
   void HaboobWindow::setupEnv(Environment* environment)

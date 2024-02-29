@@ -17,6 +17,8 @@ GBufferOut main(InputType input)
   output.diffuse.rgb = input.normal * .5 + float3(.5, .5, .5);
   output.diffuse.a = .0;
   output.normal = float4(input.normal, input.screenPosition.z); // Pack normal AND z depth
+  output.world.xyz = input.worldPosition;
+  output.world.w = 1.;
   
   return output;
 }

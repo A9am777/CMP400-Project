@@ -2,6 +2,7 @@
 
 #include "Data/Defs.h"
 #include "Rendering/Scene/Camera.h"
+#include "Rendering/Scene/FreeCam.h"
 #include "Rendering/Lighting/LightStructs.h"
 
 #include <cstring>
@@ -18,8 +19,10 @@ namespace Haboob
     HRESULT resize(ID3D11Device* device, UInt width, UInt height);
     
     void setTarget(ID3D11DeviceContext* context);
-    HRESULT rebuildLightBuffer(ID3D11DeviceContext* context);
+    HRESULT rebuildLightBuffers(ID3D11DeviceContext* context);
+    ComPtr<ID3D11Buffer>& getLightPerspectiveBuffer() { return cameraBuffer; }
     ComPtr<ID3D11Buffer>& getLightBuffer() { return lightBuffer; }
+    ComPtr<ID3D11SamplerState>& getShadowSampler() { return sampler; }
     DirectionalLightPack& getLightData() { return lightPack; }
 
     inline ID3D11ShaderResourceView* getShaderView() { return mapShaderView.Get(); }
@@ -41,6 +44,8 @@ namespace Haboob
     Camera camera;
     XMFLOAT3 renderPosition;
 
+    ComPtr<ID3D11SamplerState> sampler;
+    ComPtr<ID3D11Buffer> cameraBuffer;
     ComPtr<ID3D11Buffer> lightBuffer;
     DirectionalLightPack lightPack;
   };
