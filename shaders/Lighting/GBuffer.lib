@@ -5,6 +5,7 @@ struct GBufferOut
 {
   float4 diffuse : SV_Target0; // colour(r, g, b), unused
   float4 normal : SV_Target1; // normal(nx, ny, nz), depth
+  float4 world : SV_Target2; // world(px, py, pz), unused
 };
 
 #endif

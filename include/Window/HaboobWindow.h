@@ -14,6 +14,8 @@
 #include "Rendering/Textures/RenderTarget.h"
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
 #include "Rendering/Textures/GBuffer.h"
+#include "Rendering/Scene/Scene.h"
+#include "Rendering/Lighting/LightSource.h"
 
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyD3D11.hpp>
@@ -61,9 +63,6 @@ namespace Haboob
 
     // Steps the camera orbit
     void cameraOrbitStep(float dtConsidered);
-
-    // Strictly for testing purposes - forces the camera buffer to be resent
-    void redoCameraBuffer(ID3D11DeviceContext* context);
 
     void renderBegin();
     void renderOverlay(); // Raymarch environment
@@ -115,7 +114,8 @@ namespace Haboob
     VolumeGenerationShader haboobVolume;
 
     // Scene objects
-    DirectionalLightPack dirLightPack;
+    Scene scene;
+    Light light;
     FreeCam mainCamera;
     
     Shader* deferredVertexShader;
@@ -125,10 +125,6 @@ namespace Haboob
     GBuffer gbuffer;
     RaymarchVolumeShader raymarchShader;
     ShaderManager shaderManager;
-    
-    // Reusable buffers
-    ComPtr<ID3D11Buffer> cameraBuffer;
-    ComPtr<ID3D11Buffer> lightBuffer;
 
     private:
     Clock::time_point lastFrame;

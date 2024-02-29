@@ -47,6 +47,7 @@ namespace Haboob
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, requiredWidth, requiredHeight);
+      light.create(dev, 1024, 1024);
 
       // Initialise all shaders
       {
@@ -59,6 +60,9 @@ namespace Haboob
         GBuffer::lightShader.initShader(dev, &shaderManager);
       }
 
+      scene.init(dev, &shaderManager);
+      scene.setCamera(&mainCamera);
+
       shaderManager.bakeMacros(dev);
       
       // Generate assets
@@ -66,27 +70,31 @@ namespace Haboob
         sphereMesh.build(dev);
         cubeMesh.build(dev);
         planeMesh.build(dev);
+        scene.addMesh("Sphere", &sphereMesh);
+        scene.addMesh("Cube", &cubeMesh);
+        scene.addMesh("Plane", &planeMesh);
 
         haboobVolume.rebuild(dev);
         haboobVolume.render(device.getContext().Get());
       }
 
-      // Create buffers
+      // Set up scene objects
       {
-        // Camera buffer
-        D3D11_BUFFER_DESC bufferDesc;
-        HRESULT result = S_OK; // unused
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        bufferDesc.ByteWidth = sizeof(CameraPack);
-        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        bufferDesc.MiscFlags = 0;
-        bufferDesc.StructureByteStride = 0;
-        result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, cameraBuffer.ReleaseAndGetAddressOf());
+        typedef MeshInstance<VertexType> Instance;
+        
+        Instance* instance = new Instance(&sphereMesh);
+        instance->getPosition() = { .0f, .0f, 2.5f };
+        scene.addObject(instance);
 
-        // Light buffer
-        bufferDesc.ByteWidth = sizeof(DirectionalLightPack);
-        result = device.getDevice()->CreateBuffer(&bufferDesc, NULL, lightBuffer.ReleaseAndGetAddressOf());
+        instance = new Instance(&planeMesh);
+        instance->getRotation() = { .707f, .0f, .0f, .707f };
+        instance->getPosition() = { .0f, -1.f, .0f };
+        instance->getScale() = { 50.f, 50.f, 1.f };
+        scene.addObject(instance);
+
+        instance = new Instance(&cubeMesh);
+        instance->getPosition() = { -2.f, 1.5f, .0f };
+        scene.addObject(instance);
       }
     }
 
@@ -236,47 +244,13 @@ namespace Haboob
       shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
     }
 
+    shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
+
     // If macros changed, recompile shaders!
     shaderManager.bakeMacros(device.getDevice().Get());
 
     // Orbit the camera on the fixed path (overwrites input!)
     cameraOrbitStep(dt);
-  }
-
-  void HaboobWindow::render()
-  {
-    TracyD3D11Zone(tcyCtx, "D3DFrameScene");
-    ZoneNamed(RenderScene, true);
-
-    ID3D11DeviceContext* context = device.getContext().Get();
-
-    // Render the opaque scene in a dirty way
-    deferredVertexShader->bindShader(context);
-    deferredPixelShader->bindShader(context);
-    {
-      context->VSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
-      context->PSSetConstantBuffers(0, 1, lightBuffer.GetAddressOf());
-
-      mainCamera.setWorld(XMMatrixIdentity() * XMMatrixTranslation(spherePos[0], spherePos[1], spherePos[2]));
-      redoCameraBuffer(context);
-
-      sphereMesh.useBuffers(context);
-      sphereMesh.draw(context);
-
-      mainCamera.setWorld(XMMatrixScaling(5.f, 5.f, 1.f) * XMMatrixLookToLH(XMVectorZero(), XMVectorSet(.0f, 1.f, .0f, 1.f), XMVectorSet(.0f, .0f, -1.f, 1.f)) * XMMatrixTranslation(.0f, -1.f, .0f));
-      redoCameraBuffer(context);
-
-      planeMesh.useBuffers(context);
-      planeMesh.draw(context);
-
-      mainCamera.setWorld(XMMatrixTranslation(-2.f, 1.5f, .0f));
-      redoCameraBuffer(context);
-
-      cubeMesh.useBuffers(context);
-      cubeMesh.draw(context);
-    }
-    deferredVertexShader->unbindShader(context);
-    deferredPixelShader->unbindShader(context);
   }
 
   void HaboobWindow::createD3D()
@@ -308,17 +282,6 @@ namespace Haboob
     return ImGui_ImplWin32_WndProcHandler(wHandle, message, wParam, lParam);
   }
 
-  void HaboobWindow::redoCameraBuffer(ID3D11DeviceContext* context)
-  {
-    // Camera data
-    {
-      D3D11_MAPPED_SUBRESOURCE mapped;
-      HRESULT result = context->Map(cameraBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-      mainCamera.putPack(mapped.pData);
-      context->Unmap(cameraBuffer.Get(), 0);
-    }
-  }
-
   void HaboobWindow::renderBegin()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameBegin");
@@ -327,9 +290,32 @@ namespace Haboob
     // Render to the main target using vanilla settings
     device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
     device.setDepthEnabled(true);
+    light.updateCameraView();
+    light.rebuildLightBuffers(device.getContext().Get());
     device.clearBackBuffer();
     gbuffer.clear(device.getContext().Get());
     gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
+  }
+
+  void HaboobWindow::render()
+  {
+    TracyD3D11Zone(tcyCtx, "D3DFrameScene");
+    ZoneNamed(RenderScene, true);
+
+    ID3D11DeviceContext* context = device.getContext().Get();
+
+    // Shadowmap pass
+    light.rebuildLightBuffers(device.getContext().Get());
+    light.setTarget(context);
+    scene.setCamera(&light.getCamera());
+    scene.draw(context, false);
+
+    // Full pass
+    gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
+    scene.setCamera(&mainCamera);
+    context->PSSetConstantBuffers(0, 1, light.getLightBuffer().GetAddressOf());
+    scene.draw(context);
+
   }
 
   void HaboobWindow::renderOverlay()
@@ -339,24 +325,12 @@ namespace Haboob
 
     auto context = device.getContext().Get();
 
-    // Light data
-    {
-      D3D11_MAPPED_SUBRESOURCE mapped;
-      HRESULT result = context->Map(lightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-      std::memcpy(mapped.pData, &dirLightPack, sizeof(DirectionalLightPack));
-
-      // Normalise direction before sending
-      XMVECTOR vec = XMLoadFloat4(&dirLightPack.direction);
-      vec = XMVector3Normalize(vec);
-      XMStoreFloat4(&reinterpret_cast<DirectionalLightPack*>(mapped.pData)->direction, vec);
-
-      context->Unmap(lightBuffer.Get(), 0);
-    }
     // Basic lit pass
-    gbuffer.lightPass(context, lightBuffer.Get());
+    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), light.getShadowSampler().Get());
 
-    raymarchShader.setCameraBuffer(cameraBuffer);
-    raymarchShader.setLightBuffer(lightBuffer);
+    scene.setCamera(&mainCamera);
+    raymarchShader.setCameraBuffer(scene.getCameraBuffer());
+    raymarchShader.setLightBuffer(light.getLightBuffer());
     raymarchShader.setTarget(&gbuffer.getLitColourTarget());
 
     // Raymarch!
@@ -450,6 +424,8 @@ namespace Haboob
         haboobVolume.rebuild(device.getDevice().Get());
         haboobVolume.render(device.getContext().Get());
       }
+
+      scene.imguiSceneTree();
     }
     ImGui::End();
   }
@@ -524,9 +500,13 @@ namespace Haboob
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
     gbuffer.getGamma() = .2f;
     gbuffer.getExposure() = 1.3f;
-    dirLightPack.diffuse = { 3.96f, 3.92f, 3.14f };
-    dirLightPack.ambient = { 0.96f, 0.92f, 0.14f };
-    dirLightPack.direction = { -1.f, .25f, .0f, 1.f };
+
+    {
+      auto& lightPack = light.getLightData();
+      lightPack.diffuse = { 3.96f, 3.92f, 3.14f };
+      lightPack.ambient = { 0.96f, 0.92f, 0.14f };
+      lightPack.direction = { .0f, -1.0f, -0.09f, 1.f };
+    }
 
     // Raymarch params
     {
@@ -543,7 +523,7 @@ namespace Haboob
       opticsInfo.attenuationFactor = 12.1f;
     }
 
-    raymarchShader.getMarchInfo().iterations = 26;
+    raymarchShader.getMarchInfo().iterations = 1;
   }
 
   void HaboobWindow::setupEnv(Environment* environment)
@@ -665,21 +645,23 @@ namespace Haboob
       auto lightGroup = (new EnvironmentGroup(new args::Group(argRoot, "Light")))->setName("Light");
       root.addChildGroup(lightGroup);
 
-      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &dirLightPack.direction.x))
+      auto& lightPack = light.getLightData();
+
+      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &lightPack.direction.x))
         ->setName("Light direction")
-        ->setGUISettings(1.f, .0f, .0f));
-      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &dirLightPack.diffuse.x))
+        ->setGUISettings(.01f, .0f, .0f));
+      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &lightPack.diffuse.x))
         ->setName("Light colour")
-        ->setGUISettings(1.f, .0f, .0f));
-      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &dirLightPack.ambient.x))
+        ->setGUISettings(.1f, .0f, .0f));
+      lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &lightPack.ambient.x))
         ->setName("Light ambient")
-        ->setGUISettings(1.f, .0f, .0f));
+        ->setGUISettings(.1f, .0f, .0f));
       lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &gbuffer.getGamma()))
         ->setName("Gamma")
-        ->setGUISettings(1.f, .0f, .0f));
+        ->setGUISettings(.1f, .0f, .0f));
       lightGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &gbuffer.getExposure()))
         ->setName("Exposure")
-        ->setGUISettings(1.f, .0f, .0f));
+        ->setGUISettings(.1f, .0f, .0f));
     }
 
     {
