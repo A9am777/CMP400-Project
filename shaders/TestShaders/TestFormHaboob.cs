@@ -19,12 +19,19 @@ struct VolumeParams
   float wackyScale;
 };
 
+struct VolumeElement
+{
+  float density; // R11
+  float maxDensity; // G11
+  float angstromExponent; // B10
+};
+
 cbuffer VolumeParamsSlot : register(b0)
 {
   VolumeParams info;
 }
 
-RWTexture3D<float> textureOut : register(u0);
+RWTexture3D<VolumeElement> textureOut : register(u0);
 
 [numthreads(8, 8, 8)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
@@ -60,5 +67,10 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Compute the falloff over the square radius (plus an fBM 'interesting' alteration for exotic outputs)
   float sphereDensity = saturate(sqrRadius - dot(normalisedLocation, normalisedLocation) - info.wackyScale * pow(abs(fbm), info.wackyPower)) / sqrRadius;
   
-  textureOut[threadID.xyz] = sphereDensity * abs(fbm); // Apply spherical falloff to fBM
+  VolumeElement element;
+  element.density = sphereDensity * abs(fbm); // Apply spherical falloff to fBM
+  element.maxDensity = element.density;
+  element.angstromExponent = 2.1;
+  
+  textureOut[threadID.xyz] = element;
 }

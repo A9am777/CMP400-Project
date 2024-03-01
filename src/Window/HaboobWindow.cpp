@@ -244,6 +244,11 @@ namespace Haboob
       shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
     }
 
+    {
+      shaderManager.setMacro("SHOW_DENSITY", std::to_string(showDensity));
+      shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
+    }
+
     shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
 
     // If macros changed, recompile shaders!
@@ -412,7 +417,6 @@ namespace Haboob
     {
       ImGui::Text("FPS: %f", fps);
       ImGui::Text("Hello World");
-      ImGui::DragFloat3("Sphere Pos", spherePos, 1.f, -10.f, 10.f);
 
       if (env)
       {
@@ -495,6 +499,10 @@ namespace Haboob
     orbitStep = .011f;
     orbitProgress = .0f;
     orbitDiscreteProgress = 0;
+
+    // Render toggles
+    showDensity = false;
+    showAngstrom = false;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -639,6 +647,20 @@ namespace Haboob
         &mainRasterMode))
         ->setName("Backface/Frontface")
         ->setGUISettings((UInt)DisplayDevice::RASTER_FLAG_BACK));
+    }
+
+    {
+      auto renderToggleGroup = (new EnvironmentGroup(new args::Group(argRoot, "Render Toggles")))->setName("Render Toggles");
+      root.addChildGroup(renderToggleGroup);
+
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowDensity", "If the renderer should output density", { "sd" }),
+        &showDensity))
+        ->setName("Show Density"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowAngstrom", "If the renderer should output the angstrom exponent", { "sa" }),
+        &showAngstrom))
+        ->setName("Show Angstrom"));
     }
 
     {
