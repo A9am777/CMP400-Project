@@ -89,7 +89,7 @@ namespace Haboob
         instance = new Instance(&planeMesh);
         instance->getRotation() = { .707f, .0f, .0f, .707f };
         instance->getPosition() = { .0f, -1.f, .0f };
-        instance->getScale() = { 50.f, 50.f, 1.f };
+        instance->getScale() = { 5.f, 5.f, 1.f };
         scene.addObject(instance);
 
         instance = new Instance(&cubeMesh);
@@ -513,7 +513,7 @@ namespace Haboob
       auto& lightPack = light.getLightData();
       lightPack.diffuse = { 3.96f, 3.92f, 3.14f };
       lightPack.ambient = { 0.96f, 0.92f, 0.14f };
-      lightPack.direction = { .0f, -1.0f, -0.09f, 1.f };
+      lightPack.direction = { -1.f, .25f, .0f, 1.f };
     }
 
     // Raymarch params
@@ -531,7 +531,7 @@ namespace Haboob
       opticsInfo.attenuationFactor = 12.1f;
     }
 
-    raymarchShader.getMarchInfo().iterations = 1;
+    raymarchShader.getMarchInfo().iterations = 26;
   }
 
   void HaboobWindow::setupEnv(Environment* environment)

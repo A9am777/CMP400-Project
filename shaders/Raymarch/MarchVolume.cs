@@ -251,6 +251,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     append(angstromInte, angstromSample);
     
     float referenceOpticalDepth = opticalInfo.attenuationFactor * integrate(absorptionInte);
+    float referenceAngstromAbsorption = opticalInfo.absorptionAngstromExponent * integrate(angstromInte);
     
     // TODO: this is the non-constant second path and needs to be replaced!
     // Lets assume it is the current density along the ray for now
@@ -261,7 +262,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     
     #if APPLY_SPECTRAL
       float4x4 baseRadiance = mul(IDENTITY_MAT, (float1x4)(ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms)));
-      float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, integrate(angstromInte))) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, opticalInfo.scatterAngstromExponent));
+      float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, referenceAngstromAbsorption)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, opticalInfo.scatterAngstromExponent));
       float4x4 integratorRadiance = mul(transmissions, baseRadiance) * opticalInfo.spectralWeights;
       
       irradianceSample = mul(ONE_VEC, integratorRadiance);
@@ -283,7 +284,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte), .0, .0, .0);
     return;
   #elif SHOW_ANGSTROM
-    screenOut[threadID.xy] = float4(integrate(angstromInte), .0, .0, .0);
+    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte), .0, .0, .0);
     return;
   #endif
   

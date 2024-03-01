@@ -70,7 +70,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   VolumeElement element;
   element.density = sphereDensity * abs(fbm); // Apply spherical falloff to fBM
   element.maxDensity = element.density;
-  element.angstromExponent = 2.1;
+  element.angstromExponent = pow(1. - normalisedLocation.y - .5, 0.8);
   
   textureOut[threadID.xyz] = element;
 }
