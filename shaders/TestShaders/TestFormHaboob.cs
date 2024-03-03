@@ -1,5 +1,27 @@
 #include "../Procedural/fBM.lib"
 
+struct HaboobRadial
+{
+  float roofGradient;
+  float exponentialRate;
+  float exponentialScale;
+  float rOffset;
+  float noseHeight;
+  float blendHeight;
+  float blendRate;
+  float padding;
+};
+
+struct HaboobDistribution
+{
+  float falloffScale;
+  float heightScale;
+  float heightExponent;
+  float angleRange;
+  float anglePower;
+  float3 padding;
+};
+
 struct VolumeParams
 {
   int3 size;
@@ -17,6 +39,9 @@ struct VolumeParams
   float fbmScale;
   float wackyPower;
   float wackyScale;
+  
+  HaboobRadial radial;
+  HaboobDistribution distribution;
 };
 
 struct VolumeElement
@@ -31,6 +56,53 @@ cbuffer VolumeParamsSlot : register(b0)
   VolumeParams info;
 }
 
+// Returns the radial distance for the logarithmic component of the haboob
+float haboobUndersideRadius(float height)
+{
+  return info.radial.rOffset + info.radial.exponentialScale * log(1. + height * info.radial.exponentialRate);
+}
+
+// Returns the radial distance for the flat roof component of the haboob
+float haboobRoofRadius(float height)
+{
+  float nose = info.radial.noseHeight;
+  return info.radial.roofGradient * (height - nose) + haboobUndersideRadius(nose);
+}
+
+// Returns the radial distance representing the leading edge of the haboob
+float haboobRadius(float height)
+{
+  float undersideValue = haboobUndersideRadius(height);
+  float flatRoofValue = haboobRoofRadius(height);
+  
+  // Exponential easing function
+  float easing = max((height - info.radial.noseHeight) / info.radial.blendHeight, .0);
+  easing = exp(-info.radial.blendRate * easing);
+  
+  return lerp(flatRoofValue, undersideValue, easing);
+}
+
+float haboobVerticalFlux(float height)
+{
+  return pow(info.distribution.heightScale * (1. + height), -info.distribution.heightExponent);
+}
+
+float haboobAngularFlux(float angle)
+{
+  float halfRange = info.distribution.angleRange * .5;
+  float linearAngle = abs(halfRange - angle) / halfRange;
+  return 1. - smoothstep(.0, 1., pow(linearAngle, info.distribution.anglePower));
+}
+
+float simpleBoltzmannFalloff(float x, float peakX, float falloff)
+{
+  static float constAxisOffset = sqrt(2.) * .5;
+  float xSubstitute = peakX - falloff * constAxisOffset;
+  float innerValue = (x - xSubstitute) / falloff;
+  
+  return saturate(innerValue * exp(-innerValue * innerValue));
+}
+
 RWTexture3D<VolumeElement> textureOut : register(u0);
 
 [numthreads(8, 8, 8)]
@@ -40,6 +112,18 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   float3 normalisedLocation = float3(threadID.xyz) / float3(info.size);
   normalisedLocation = normalisedLocation - float3(.5, .5, .5);
   float sqrRadius = .5 * .5;
+  
+  float3 cylinderCoord = float3(threadID.xyz) / float3(info.size);
+  cylinderCoord.xz = 2. * cylinderCoord.xz - float2(1., 1.);
+  
+  // Determine where the leading edge lies
+  float leadingRadius = haboobRadius(cylinderCoord.y);
+  float radius = length(float2(cylinderCoord.x, cylinderCoord.z));
+  float arcAngle = atan2(cylinderCoord.x, cylinderCoord.z);
+  float arcDensity = haboobAngularFlux(arcAngle);
+  float radialDensity = simpleBoltzmannFalloff(radius, leadingRadius, info.distribution.falloffScale);
+  float heightDensity = haboobVerticalFlux(cylinderCoord.y);
+  
   
   // Start the parallel random number sequencer
   TEA rng;
@@ -65,10 +149,11 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   }
   
   // Compute the falloff over the square radius (plus an fBM 'interesting' alteration for exotic outputs)
-  float sphereDensity = saturate(sqrRadius - dot(normalisedLocation, normalisedLocation) - info.wackyScale * pow(abs(fbm), info.wackyPower)) / sqrRadius;
+  //float sphereDensity = saturate(sqrRadius - dot(normalisedLocation, normalisedLocation) - info.wackyScale * pow(abs(fbm), info.wackyPower)) / sqrRadius;
+  float density = arcDensity * radialDensity * heightDensity;
   
   VolumeElement element;
-  element.density = sphereDensity * abs(fbm); // Apply spherical falloff to fBM
+  element.density = density;
   element.maxDensity = element.density;
   element.angstromExponent = pow(1. - normalisedLocation.y - .5, 0.8);
   

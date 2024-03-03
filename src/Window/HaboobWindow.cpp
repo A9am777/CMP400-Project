@@ -256,6 +256,13 @@ namespace Haboob
 
     // Orbit the camera on the fixed path (overwrites input!)
     cameraOrbitStep(dt);
+
+    // Re-render the haboob on demand
+    if (renderHaboob)
+    {
+      haboobVolume.rebuild(device.getDevice().Get());
+      haboobVolume.render(device.getContext().Get());
+    }
   }
 
   void HaboobWindow::createD3D()
@@ -423,12 +430,6 @@ namespace Haboob
         env->getRoot().imguiGUIShow();
       }
 
-      if (ImGui::Button("Regen Haboob"))
-      {
-        haboobVolume.rebuild(device.getDevice().Get());
-        haboobVolume.render(device.getContext().Get());
-      }
-
       scene.imguiSceneTree();
     }
     ImGui::End();
@@ -503,6 +504,7 @@ namespace Haboob
     // Render toggles
     showDensity = false;
     showAngstrom = false;
+    renderHaboob = false;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -531,7 +533,7 @@ namespace Haboob
       opticsInfo.attenuationFactor = 12.1f;
     }
 
-    raymarchShader.getMarchInfo().iterations = 26;
+    raymarchShader.getMarchInfo().iterations = 16;
   }
 
   void HaboobWindow::setupEnv(Environment* environment)
@@ -592,7 +594,6 @@ namespace Haboob
       cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMouseSensitivity()))
         ->setName("Camera Look Speed")
         ->setGUISettings(1.f, .0f, .0f));
-
 
       {
         auto orbitGroup = (new EnvironmentGroup(new args::Group(argRoot, "Orbit")))->setName("Orbit");
@@ -661,6 +662,8 @@ namespace Haboob
         new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowAngstrom", "If the renderer should output the angstrom exponent", { "sa" }),
         &showAngstrom))
         ->setName("Show Angstrom"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool, nullptr, &renderHaboob))
+        ->setName("Render Haboob"));
     }
 
     {
@@ -723,6 +726,51 @@ namespace Haboob
       haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.wackyScale))
         ->setName("Haboob Wacky Scale (tm)")
         ->setGUISettings(1.f, .0f, 10.f));
+
+      {
+        auto haboobShapeGroup = (new EnvironmentGroup(new args::Group(argRoot, "HaboobShape")))->setName("HaboobShape");
+        haboobGroup->addChildGroup(haboobShapeGroup);
+
+        // Radial
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.radial.roofGradient))
+          ->setName("Haboob Radial Roof Grad")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.radial.exponentialRate))
+          ->setName("Haboob Radial Exponential Rate")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.radial.exponentialScale))
+          ->setName("Haboob Radial Exponential Scale")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.radial.rOffset))
+          ->setName("Haboob Radial Offset")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.radial.noseHeight))
+          ->setName("Haboob Radial Nose Height")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.radial.blendHeight))
+          ->setName("Haboob Radial Blend Height")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.radial.blendRate))
+          ->setName("Haboob Radial Blend Rate")
+          ->setGUISettings(.01f, -10.f, 10.f));
+
+        // Distribution
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.distribution.falloffScale))
+          ->setName("Haboob Dist. Falloff Scale")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.distribution.heightScale))
+          ->setName("Haboob Dist. Height Scale")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.distribution.heightExponent))
+          ->setName("Haboob Dist. Height Exponent")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.distribution.angleRange))
+          ->setName("Haboob Dist. Angle Range")
+          ->setGUISettings(.01f, -10.f, 10.f));
+        haboobShapeGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.distribution.anglePower))
+          ->setName("Haboob Dist. Angle Power")
+          ->setGUISettings(.01f, -10.f, 10.f));
+      }
     }
 
     {

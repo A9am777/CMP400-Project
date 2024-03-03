@@ -46,6 +46,28 @@ namespace Haboob
   class VolumeGenerationShader
   {
     public:
+    struct HaboobRadial
+    {
+      float roofGradient = -3.87f;
+      float exponentialRate = 20.f;
+      float exponentialScale = .22f;
+      float rOffset = .0f;
+      float noseHeight = .34f;
+      float blendHeight = .22f;
+      float blendRate = .25f;
+      float padding = .0f;
+    };
+
+    struct HaboobDistribution
+    {
+      float falloffScale = .4f;
+      float heightScale = 1.3f;
+      float heightExponent = .2f;
+      float angleRange = 2.8f;
+      float anglePower = 3.f;
+      XMFLOAT3 padding;
+    };
+
     struct VolumeInfo
     {
       XMINT3 size = {128, 128, 128}; // Texture size
@@ -63,6 +85,9 @@ namespace Haboob
       float fbmScale = .4f;
       float wackyPower = .8f;
       float wackyScale = .0f;
+
+      HaboobRadial radial;
+      HaboobDistribution distribution;
     };
 
     VolumeGenerationShader();
