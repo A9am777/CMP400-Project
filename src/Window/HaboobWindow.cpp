@@ -525,15 +525,15 @@ namespace Haboob
       opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
       opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
       opticsInfo.phaseBlendWeightTerms = { .2f, .2f, .2f, .2f, };
-      opticsInfo.scatterAngstromExponent = 3.1f;
+      opticsInfo.scatterAngstromExponent = 9.1f;
 
       opticsInfo.ambientFraction = { .8f, .8f, .8f, .8f, };
-      opticsInfo.absorptionAngstromExponent = 2.1f;
+      opticsInfo.absorptionAngstromExponent = 34.1f;
       opticsInfo.powderCoefficient = .035f;
-      opticsInfo.attenuationFactor = 12.1f;
+      opticsInfo.attenuationFactor = 24.f;
     }
 
-    raymarchShader.getMarchInfo().iterations = 16;
+    raymarchShader.getMarchInfo().iterations = 26;
   }
 
   void HaboobWindow::setupEnv(Environment* environment)

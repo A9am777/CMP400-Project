@@ -111,19 +111,8 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Fetch the location within the texture relative to the centre
   float3 normalisedLocation = float3(threadID.xyz) / float3(info.size);
   normalisedLocation = normalisedLocation - float3(.5, .5, .5);
-  float sqrRadius = .5 * .5;
-  
   float3 cylinderCoord = float3(threadID.xyz) / float3(info.size);
   cylinderCoord.xz = 2. * cylinderCoord.xz - float2(1., 1.);
-  
-  // Determine where the leading edge lies
-  float leadingRadius = haboobRadius(cylinderCoord.y);
-  float radius = length(float2(cylinderCoord.x, cylinderCoord.z));
-  float arcAngle = atan2(cylinderCoord.x, cylinderCoord.z);
-  float arcDensity = haboobAngularFlux(arcAngle);
-  float radialDensity = simpleBoltzmannFalloff(radius, leadingRadius, info.distribution.falloffScale);
-  float heightDensity = haboobVerticalFlux(cylinderCoord.y);
-  
   
   // Start the parallel random number sequencer
   TEA rng;
@@ -147,6 +136,14 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     noise.fracIncr = info.fractionalIncrement;
     fbm = noise.fBMNoise(world, rng, normalisedLocation.xyz, float3(info.fbmOffset, info.fbmOffset, info.fbmOffset), float3(info.fbmScale, info.fbmScale, info.fbmScale));
   }
+  
+  // Determine where the leading edge lies
+  float leadingRadius = haboobRadius(cylinderCoord.y);
+  float radius = length(float2(cylinderCoord.x, cylinderCoord.z)) + info.wackyScale * fbm;
+  float arcAngle = atan2(cylinderCoord.z, -cylinderCoord.x) + 1.57079632679;
+  float arcDensity = haboobAngularFlux(arcAngle);
+  float radialDensity = simpleBoltzmannFalloff(radius, leadingRadius, info.distribution.falloffScale);
+  float heightDensity = haboobVerticalFlux(cylinderCoord.y);
   
   // Compute the falloff over the square radius (plus an fBM 'interesting' alteration for exotic outputs)
   //float sphereDensity = saturate(sqrRadius - dot(normalisedLocation, normalisedLocation) - info.wackyScale * pow(abs(fbm), info.wackyPower)) / sqrRadius;

@@ -63,7 +63,7 @@ namespace Haboob
       float falloffScale = .4f;
       float heightScale = 1.3f;
       float heightExponent = .2f;
-      float angleRange = 2.8f;
+      float angleRange = 4.2f;
       float anglePower = 3.f;
       XMFLOAT3 padding;
     };
@@ -78,13 +78,13 @@ namespace Haboob
 
       float worldSize = 5.f;
       float octaves = 3.1f;
-      float fractionalGap = 2.4f;
-      float fractionalIncrement = 1.01f;
+      float fractionalGap = 4.4f;
+      float fractionalIncrement = 0.99f;
 
       float fbmOffset = .1f;
       float fbmScale = .4f;
       float wackyPower = .8f;
-      float wackyScale = .0f;
+      float wackyScale = .6f;
 
       HaboobRadial radial;
       HaboobDistribution distribution;
