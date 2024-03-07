@@ -12,7 +12,8 @@ struct MarchVolumeDispatchInfo
  
   uint iterations; // Number of volume steps to take
   uint flagManualMarch; // Whether to attempt to automatically adjust raymarching or use the manual values
-  float2 padding;
+  float pixelRadius; // The radius a pixel occupies in world space
+  float pixelRadiusDelta; // The linear change of pixel radius with world depth
 };
 
 struct BasicOptics
@@ -45,6 +46,7 @@ struct Ray
   float4 pos;
   float4 dir;
   float4 colour;
+  float travelDistance; // World distance the ray has traversed
 };
 
 struct Sphere

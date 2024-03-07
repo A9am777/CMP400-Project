@@ -21,14 +21,13 @@ namespace Haboob
     void addObject(MeshInstance<VertexType>* instance);
 
     HRESULT init(ID3D11Device* device, ShaderManager* manager);
+    HRESULT rebuildCameraBuffer(ID3D11DeviceContext* context);
     void draw(ID3D11DeviceContext* context, bool usePixel = true);
 
     ComPtr<ID3D11Buffer>& getCameraBuffer() { return cameraBuffer; }
 
     void imguiSceneTree();
 
-    protected:
-    HRESULT rebuildCameraBuffer(ID3D11DeviceContext* context);
 
     private:
     // Reusable buffers

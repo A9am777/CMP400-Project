@@ -1,5 +1,9 @@
 #include "Rendering/Shaders/ShaderManager.h"
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
+#include <cmath>
+
+#undef min
+#undef max
 
 namespace Haboob
 {
@@ -44,7 +48,7 @@ namespace Haboob
       volumeSamplerDesc.AddressU = volumeSamplerDesc.AddressV = volumeSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
       volumeSamplerDesc.BorderColor[0] = volumeSamplerDesc.BorderColor[1] = volumeSamplerDesc.BorderColor[2] = volumeSamplerDesc.BorderColor[3] = 0.f;
 
-      volumeSamplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+      volumeSamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
       volumeSamplerDesc.MipLODBias = 0.0f;
       volumeSamplerDesc.MaxAnisotropy = 1;
       volumeSamplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
@@ -100,7 +104,8 @@ namespace Haboob
 
   void RaymarchVolumeShader::render(ID3D11DeviceContext* context) const
   {
-    computeShader->dispatch(context, renderTarget->getWidth(), renderTarget->getHeight());
+    static constexpr UInt groupSize = 16;
+    computeShader->dispatch(context, renderTarget->getWidth() / groupSize, renderTarget->getHeight() / groupSize);
   }
 
   void RaymarchVolumeShader::buildSpectralMatrices()
@@ -199,10 +204,13 @@ namespace Haboob
       volumeTextureDesc.Width = volumeInfo.size.x;
       volumeTextureDesc.Height = volumeInfo.size.y;
       volumeTextureDesc.Depth = volumeInfo.size.z;
-      volumeTextureDesc.MipLevels = 1;
+      volumeTextureDesc.MipLevels = std::min(volumeTextureDesc.Width, volumeTextureDesc.Height);
+      volumeTextureDesc.MipLevels = std::min(volumeTextureDesc.MipLevels, volumeTextureDesc.Depth);
+      volumeTextureDesc.MipLevels = std::log2(volumeTextureDesc.MipLevels);
       volumeTextureDesc.Format = DXGI_FORMAT_R11G11B10_FLOAT;
       volumeTextureDesc.Usage = D3D11_USAGE_DEFAULT;
       volumeTextureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+      volumeTextureDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
 
       result = device->CreateTexture3D(&volumeTextureDesc, nullptr, texture.ReleaseAndGetAddressOf());
       Firebreak(result);
@@ -230,7 +238,7 @@ namespace Haboob
 
       shaderViewDesc.Format = volumeTextureDesc.Format;
       shaderViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-      shaderViewDesc.Texture3D.MipLevels = 1;
+      shaderViewDesc.Texture3D.MipLevels = volumeTextureDesc.MipLevels;
 
       result = device->CreateShaderResourceView(texture.Get(), &shaderViewDesc, textureShaderView.ReleaseAndGetAddressOf());
       Firebreak(result);
@@ -257,10 +265,12 @@ namespace Haboob
   {
     generateVolumeShader->bindShader(context);
     bindShader(context);
-    static const int groupSize = 8;
+    static constexpr UInt groupSize = 8;
     Shader::dispatch(context, volumeInfo.size.x / groupSize, volumeInfo.size.y / groupSize, volumeInfo.size.z / groupSize);
     unbindShader(context);
     generateVolumeShader->unbindShader(context);
+
+    context->GenerateMips(textureShaderView.Get());
   }
 
   void VolumeGenerationShader::bindShader(ID3D11DeviceContext* context)
