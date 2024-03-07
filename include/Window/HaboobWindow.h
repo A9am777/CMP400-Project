@@ -100,6 +100,11 @@ namespace Haboob
     float orbitProgress; // In rads
     int orbitDiscreteProgress; // Frames passed (external input)
 
+    // Render toggles
+    bool showDensity;
+    bool showAngstrom;
+    bool renderHaboob;
+
     // Rendering device
     DisplayDevice device;
 
@@ -131,7 +136,6 @@ namespace Haboob
 
     // ImGui
     float fps;
-    float spherePos[3] = {.0f, .0f, 2.5f};
     UInt mainRasterMode;
     ImGuiContext* imgui;
   };

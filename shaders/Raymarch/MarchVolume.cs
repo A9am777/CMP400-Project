@@ -6,6 +6,8 @@
   #define APPLY_HG 1
   #define APPLY_SPECTRAL 1
   #define MARCH_STEP_COUNT 24
+  #define SHOW_DENSITY 0
+  #define SHOW_ANGSTROM 0
 #endif
 
 RWTexture2D<float4> screenOut : register(u0);
@@ -89,6 +91,15 @@ float cubeDensitySample(in Ray ray, in Cube cube)
   localPos.xyz = localPos.xyz / cube.size;
   
   return volumeTexture.SampleLevel(volumeSampler, localPos, .5).r;
+}
+
+float3 haboobCubeDensitySample(in Ray ray, in Cube cube)
+{
+  // Compute the local coordinates within the cube (TODO: use matrix)
+  float3 localPos = ray.pos.xyz - cube.pos.xyz;
+  localPos.xyz = localPos.xyz / cube.size;
+  
+  return volumeTexture.SampleLevel(volumeSampler, localPos, .5).rgb;
 }
 
 float4 alphaBlend(float4 foreground, float4 background)
@@ -217,6 +228,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   float4 ambientIrradiance = opticalInfo.ambientFraction * float4(light.ambient, light.ambient.r) * Phase(1., opticalInfo.anisotropicForwardTerms);
   
   Integrator absorptionInte = { 0, 0, 0, 0, 0 }; // Keep distinct from transmission
+  Integrator angstromInte = { 0, 0, 0, 0, 0 };
   // Spectral CIE X1YZX2
   Integrator irradianceInteX = { 0, 0, 0, 0, 0 };
   Integrator irradianceInteY = { 0, 0, 0, 0, 0 };
@@ -230,10 +242,16 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   for (uint i = 0; i < params.iterations; ++i)
   {
     // Accumulate absorption from density
-    float densitySample = cubeDensitySample(ray, cube);
+    float3 haboobSample = haboobCubeDensitySample(ray, cube);
+    float densitySample = haboobSample.x;
+    float densityMaxSample = haboobSample.y;
+    float angstromSample = haboobSample.z;
+    
     append(absorptionInte, densitySample);
+    append(angstromInte, angstromSample);
     
     float referenceOpticalDepth = opticalInfo.attenuationFactor * integrate(absorptionInte);
+    float referenceAngstromAbsorption = opticalInfo.absorptionAngstromExponent * integrate(angstromInte);
     
     // TODO: this is the non-constant second path and needs to be replaced!
     // Lets assume it is the current density along the ray for now
@@ -244,7 +262,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     
     #if APPLY_SPECTRAL
       float4x4 baseRadiance = mul(IDENTITY_MAT, (float1x4)(ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms)));
-      float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, opticalInfo.absorptionAngstromExponent)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, opticalInfo.scatterAngstromExponent));
+      float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, referenceAngstromAbsorption)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, opticalInfo.scatterAngstromExponent));
       float4x4 integratorRadiance = mul(transmissions, baseRadiance) * opticalInfo.spectralWeights;
       
       irradianceSample = mul(ONE_VEC, integratorRadiance);
@@ -260,6 +278,16 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     // March again!
     march(ray, params.marchZStep);
   }
+  
+  // Debug/testing outputs
+  #if SHOW_DENSITY
+    screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte), .0, .0, .0);
+    return;
+  #elif SHOW_ANGSTROM
+    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte), .0, .0, .0);
+    return;
+  #endif
+  
   
   // Apply scattering to incoming background irradiance
   screenOut[threadID.xy] *= blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte)); //TODO: BP is not very good here

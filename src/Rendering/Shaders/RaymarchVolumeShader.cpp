@@ -200,7 +200,7 @@ namespace Haboob
       volumeTextureDesc.Height = volumeInfo.size.y;
       volumeTextureDesc.Depth = volumeInfo.size.z;
       volumeTextureDesc.MipLevels = 1;
-      volumeTextureDesc.Format = DXGI_FORMAT_R32_FLOAT;
+      volumeTextureDesc.Format = DXGI_FORMAT_R11G11B10_FLOAT;
       volumeTextureDesc.Usage = D3D11_USAGE_DEFAULT;
       volumeTextureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
 
@@ -240,7 +240,7 @@ namespace Haboob
     {
       D3D11_UNORDERED_ACCESS_VIEW_DESC computeAccessDesc;
       ZeroMemory(&computeAccessDesc, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
-      computeAccessDesc.Format = DXGI_FORMAT_R32_FLOAT;
+      computeAccessDesc.Format = volumeTextureDesc.Format;
       computeAccessDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE3D;
       computeAccessDesc.Texture3D.FirstWSlice = 0;
       computeAccessDesc.Texture3D.MipSlice = 0;
