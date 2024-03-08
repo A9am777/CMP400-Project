@@ -11,7 +11,7 @@ struct MarchVolumeDispatchInfo
   float marchZStep; // Distance to typically jump in Z
  
   uint iterations; // Number of volume steps to take
-  uint flagManualMarch; // Whether to attempt to automatically adjust raymarching or use the manual values
+  float texelDensity; // The density of the volume texture in world space
   float pixelRadius; // The radius a pixel occupies in world space
   float pixelRadiusDelta; // The linear change of pixel radius with world depth
 };

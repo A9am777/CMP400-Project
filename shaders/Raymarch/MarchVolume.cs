@@ -6,6 +6,7 @@
   #define APPLY_HG 1
   #define APPLY_SPECTRAL 1
   #define APPLY_CONE_TRACE 1
+  #define MARCH_MANUAL 0
   #define MARCH_STEP_COUNT 24
   #define SHOW_DENSITY 0
   #define SHOW_ANGSTROM 0
@@ -82,9 +83,10 @@ bool inSphere(in Ray ray, in Sphere sphere)
 }
 
 // Returns the sample level for cone tracing
-float getConeSampleLevel(in Ray ray)
+float getConeSampleLevel(in Ray ray, float worldToTexels)
 {
-  return log2(dispatchInfo.pixelRadius + dispatchInfo.pixelRadiusDelta * ray.travelDistance);
+  float rayRadius = dispatchInfo.pixelRadius + dispatchInfo.pixelRadiusDelta * ray.travelDistance;
+  return log2(rayRadius * worldToTexels);
 }
 
 float sphereDensitySample(in Ray ray, in Sphere sphere)
@@ -109,7 +111,7 @@ float3 haboobCubeDensitySample(in Ray ray, in Cube cube)
   localPos.xyz = localPos.xyz / cube.size;
   
   #if APPLY_CONE_TRACE
-    return volumeTexture.SampleLevel(volumeSampler, localPos, getConeSampleLevel(ray)).rgb;
+    return volumeTexture.SampleLevel(volumeSampler, localPos, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x)).rgb;
   #else
     return volumeTexture.SampleLevel(volumeSampler, localPos, .0).rgb;
   #endif
@@ -218,11 +220,10 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   params.marchZStep = dispatchInfo.marchZStep;
   params.initialStep = dispatchInfo.initialZStep;
   params.mask = 0;
-  if (!dispatchInfo.flagManualMarch)
-  {
+  #if !MARCH_MANUAL
     // Use the bounding sphere to approximate better params
     determineSphereParams(params, ray, sphere);
-  }
+  #endif
   
   // Exit now if possible
   if(params.mask)
@@ -301,9 +302,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte), .0, .0, .0);
     return;
   #elif SHOW_SAMPLE_LEVEL
-    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray), .0, .0);
+    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x), .0, .0);
     ray.travelDistance = params.initialStep;
-    sampleLevelInfo.x = getConeSampleLevel(ray);
+    sampleLevelInfo.x = getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x);
     screenOut[threadID.xy] = sampleLevelInfo / 8.;
     return;
   #endif 
