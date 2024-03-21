@@ -152,7 +152,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   VolumeElement element;
   element.density = density;
   element.maxDensity = element.density;
-  element.angstromExponent = pow(1. - normalisedLocation.y - .5, 0.8);
+  element.angstromExponent = pow(.5 - normalisedLocation.y, info.wackyPower) + info.wackyScale * fbm;
   
   textureOut[threadID.xyz] = element;
 }

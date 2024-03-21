@@ -250,9 +250,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   Integrator irradianceInteZ = { 0, 0, 0, 0, 0 };
   Integrator irradianceInteX2 = { 0, 0, 0, 0, 0 };
   
-  // TODO: WTF?
-  // for(uint i = 0; i < MARCH_STEP_COUNT; ++i)
-  
   [loop] // Yeah need to consider this impact
   for (uint i = 0; i < params.iterations; ++i)
   {
