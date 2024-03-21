@@ -12,8 +12,9 @@ namespace Haboob
     float marchZStep = .1f; // Distance to jump in Z
     
     UINT iterations = 10; // Number of volume steps to take
-    UINT flagManualMarch = 0; // Whether to attempt to automatically adjust raymarching or use the manual values
-    XMFLOAT2 padding;
+    float texelDensity; // The density of the volume texture in world space
+    float pixelRadius = .001f; // The radius a pixel occupies in world space
+    float pixelRadiusDelta = .245f; // The linear change of pixel radius with world depth
   };
 
   struct BasicOptics

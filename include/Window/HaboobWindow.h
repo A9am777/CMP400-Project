@@ -103,7 +103,11 @@ namespace Haboob
     // Render toggles
     bool showDensity;
     bool showAngstrom;
+    bool showSampleLevel;
     bool renderHaboob;
+    bool renderScene;
+    bool coneTrace;
+    bool manualMarch;
 
     // Rendering device
     DisplayDevice device;

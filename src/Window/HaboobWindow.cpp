@@ -76,6 +76,7 @@ namespace Haboob
 
         haboobVolume.rebuild(dev);
         haboobVolume.render(device.getContext().Get());
+        raymarchShader.getMarchInfo().texelDensity = float(haboobVolume.getVolumeInfo().size.x);
       }
 
       // Set up scene objects
@@ -242,11 +243,14 @@ namespace Haboob
       shaderManager.setMacro("APPLY_BEER", std::to_string(opticsInfo.flagApplyBeer));
       shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
       shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
+      shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
+      shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
     }
 
     {
       shaderManager.setMacro("SHOW_DENSITY", std::to_string(showDensity));
       shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
+      shaderManager.setMacro("SHOW_SAMPLE_LEVEL", std::to_string(showSampleLevel));
     }
 
     shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
@@ -262,6 +266,7 @@ namespace Haboob
     {
       haboobVolume.rebuild(device.getDevice().Get());
       haboobVolume.render(device.getContext().Get());
+      raymarchShader.getMarchInfo().texelDensity = float(haboobVolume.getVolumeInfo().size.x);
     }
   }
 
@@ -287,6 +292,17 @@ namespace Haboob
     float nearZ = .1f;
     float farZ = 100.f;
     mainCamera.setProjection(XMMatrixPerspectiveFovLH(fov, screenAspect, nearZ, farZ));
+
+    // Determine pixel radius
+    {
+      float heightDivisions = 2.f / requiredHeight;
+      float zSpread = std::tanf(fov * .5f);
+      float zStepRadius = zSpread * heightDivisions * std::sqrtf(2.f); // Spread of the divisions as a radius sqrt(2)
+
+      auto& marchInfo = raymarchShader.getMarchInfo();
+      marchInfo.pixelRadius = zStepRadius * nearZ;
+      marchInfo.pixelRadiusDelta = zStepRadius;
+    }
   }
 
   LRESULT HaboobWindow::customRoutine(UINT message, WPARAM wParam, LPARAM lParam)
@@ -323,11 +339,16 @@ namespace Haboob
     scene.draw(context, false);
 
     // Full pass
-    gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
     scene.setCamera(&mainCamera);
-    context->PSSetConstantBuffers(0, 1, light.getLightBuffer().GetAddressOf());
-    scene.draw(context);
-
+    scene.rebuildCameraBuffer(context);
+    gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
+    
+    
+    if (renderScene)
+    {
+      context->PSSetConstantBuffers(0, 1, light.getLightBuffer().GetAddressOf());
+      scene.draw(context);
+    }
   }
 
   void HaboobWindow::renderOverlay()
@@ -504,7 +525,11 @@ namespace Haboob
     // Render toggles
     showDensity = false;
     showAngstrom = false;
+    showSampleLevel = false;
     renderHaboob = false;
+    renderScene = true;
+    coneTrace = true;
+    manualMarch = false;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -662,6 +687,14 @@ namespace Haboob
         new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowAngstrom", "If the renderer should output the angstrom exponent", { "sa" }),
         &showAngstrom))
         ->setName("Show Angstrom"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowSampleLevel", "If the renderer should output the sample level range", { "ssl" }),
+        &showSampleLevel))
+        ->setName("Show Sample Level"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "RenderScene", "If the renderer should render the scene to the GBuffer", { "rs" }),
+        &renderScene))
+        ->setName("Render Scene"));
       renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool, nullptr, &renderHaboob))
         ->setName("Render Haboob"));
     }
@@ -789,9 +822,14 @@ namespace Haboob
         &marchInfo.iterations))
         ->setName("Step count")
         ->setGUISettings(1.f, 0, 100));
-      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &marchInfo.flagManualMarch))
-        ->setName("Use manual step")
-        ->setGUISettings(~0));
+      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool, nullptr, &manualMarch))
+        ->setName("Use manual step"));
+      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &marchInfo.pixelRadius))
+        ->setName("Pixel radius")
+        ->setGUISettings(.0001f, .0f, 1.f));
+      raymarchGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &marchInfo.pixelRadiusDelta))
+        ->setName("Pixel radius z-delta")
+        ->setGUISettings(.0001f, .0f, 1.f));
     }
 
     {
@@ -838,6 +876,10 @@ namespace Haboob
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplySpectral))
         ->setName("Apply Spectral")
         ->setGUISettings(~0));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool, 
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyConeTrace", "If cone tracing should be used for anti-aliasing", { "uct" }), 
+        &coneTrace))
+        ->setName("Apply Cone Tracing"));
     }
   }
   void HaboobWindow::show()

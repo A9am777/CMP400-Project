@@ -5,9 +5,12 @@
   #define APPLY_BEER 1
   #define APPLY_HG 1
   #define APPLY_SPECTRAL 1
+  #define APPLY_CONE_TRACE 1
+  #define MARCH_MANUAL 0
   #define MARCH_STEP_COUNT 24
   #define SHOW_DENSITY 0
   #define SHOW_ANGSTROM 0
+  #define SHOW_SAMPLE_LEVEL 0
 #endif
 
 RWTexture2D<float4> screenOut : register(u0);
@@ -44,6 +47,7 @@ void fromHomogeneous(inout float4 vec)
 void march(inout Ray ray, float stepSize)
 {
   ray.pos = ray.pos + ray.dir * stepSize;
+  ray.travelDistance += stepSize;
 }
 
 float3 solveQuadratic(float a, float b, float c)
@@ -78,6 +82,13 @@ bool inSphere(in Ray ray, in Sphere sphere)
   return dot(displacement, displacement) <= sphere.sqrRadius; // dot(x, x) = |x|^2
 }
 
+// Returns the sample level for cone tracing
+float getConeSampleLevel(in Ray ray, float worldToTexels)
+{
+  float rayRadius = dispatchInfo.pixelRadius + dispatchInfo.pixelRadiusDelta * ray.travelDistance;
+  return log2(rayRadius * worldToTexels);
+}
+
 float sphereDensitySample(in Ray ray, in Sphere sphere)
 {
   float3 displacement = ray.pos.xyz - sphere.pos.xyz;
@@ -99,7 +110,11 @@ float3 haboobCubeDensitySample(in Ray ray, in Cube cube)
   float3 localPos = ray.pos.xyz - cube.pos.xyz;
   localPos.xyz = localPos.xyz / cube.size;
   
-  return volumeTexture.SampleLevel(volumeSampler, localPos, .5).rgb;
+  #if APPLY_CONE_TRACE
+    return volumeTexture.SampleLevel(volumeSampler, localPos, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x)).rgb;
+  #else
+    return volumeTexture.SampleLevel(volumeSampler, localPos, .0).rgb;
+  #endif
 }
 
 float4 alphaBlend(float4 foreground, float4 background)
@@ -163,7 +178,7 @@ float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
 #define Transmission(opticalDepths) bpTransmission(opticalDepths)
 #define Integrator SimpsonsIntegrator
 
-[numthreads(1, 1, 1)]
+[numthreads(16, 16, 1)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
   // Actually a matrix is probably better here, maybe even rasterisation pass?
@@ -186,6 +201,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     ray.dir = normalize(directionPointTarget - ray.pos);
   }
   ray.colour = float4(1., 1., 1., 0.);
+  ray.travelDistance = .0;
   
   // Bounding sphere
   Sphere sphere;
@@ -204,11 +220,10 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   params.marchZStep = dispatchInfo.marchZStep;
   params.initialStep = dispatchInfo.initialZStep;
   params.mask = 0;
-  if (!dispatchInfo.flagManualMarch)
-  {
+  #if !MARCH_MANUAL
     // Use the bounding sphere to approximate better params
     determineSphereParams(params, ray, sphere);
-  }
+  #endif
   
   // Exit now if possible
   if(params.mask)
@@ -234,9 +249,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   Integrator irradianceInteY = { 0, 0, 0, 0, 0 };
   Integrator irradianceInteZ = { 0, 0, 0, 0, 0 };
   Integrator irradianceInteX2 = { 0, 0, 0, 0, 0 };
-  
-  // TODO: WTF?
-  // for(uint i = 0; i < MARCH_STEP_COUNT; ++i)
   
   [loop] // Yeah need to consider this impact
   for (uint i = 0; i < params.iterations; ++i)
@@ -286,8 +298,14 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   #elif SHOW_ANGSTROM
     screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte), .0, .0, .0);
     return;
-  #endif
-  
+  #elif SHOW_SAMPLE_LEVEL
+    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x), .0, .0);
+    ray.travelDistance = params.initialStep;
+    sampleLevelInfo.x = getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x);
+    screenOut[threadID.xy] = sampleLevelInfo / 8.;
+    return;
+  #endif 
+
   
   // Apply scattering to incoming background irradiance
   screenOut[threadID.xy] *= blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte)); //TODO: BP is not very good here
