@@ -47,6 +47,7 @@ namespace Haboob
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, requiredWidth, requiredHeight);
+      raymarchShader.createIntermediate(dev, requiredWidth >> 1, requiredHeight >> 1);
       light.create(dev, 1024, 1024);
 
       // Initialise all shaders
@@ -96,6 +97,13 @@ namespace Haboob
         instance = new Instance(&cubeMesh);
         instance->getPosition() = { -2.f, 1.5f, .0f };
         scene.addObject(instance);
+
+        // Haboob volume
+        instance = new Instance(&cubeMesh);
+        instance->getPosition() = { .0f, .0f, .0f };
+        instance->getScale() = { 3.f, 3.f, 3.f };
+        scene.addObject(instance);
+        raymarchShader.setBox(instance);
       }
     }
 
@@ -268,6 +276,8 @@ namespace Haboob
       haboobVolume.render(device.getContext().Get());
       raymarchShader.getMarchInfo().texelDensity = float(haboobVolume.getVolumeInfo().size.x);
     }
+
+    raymarchShader.getBox()->setVisible(showBoundingBoxes);
   }
 
   void HaboobWindow::createD3D()
@@ -284,6 +294,7 @@ namespace Haboob
   void HaboobWindow::adjustProjection()
   {
     gbuffer.resize(device.getDevice().Get(), requiredWidth, requiredHeight);
+    raymarchShader.resizeIntermediate(device.getDevice().Get(), requiredWidth >> 1, requiredHeight >> 1);
 
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
@@ -365,6 +376,7 @@ namespace Haboob
     raymarchShader.setCameraBuffer(scene.getCameraBuffer());
     raymarchShader.setLightBuffer(light.getLightBuffer());
     raymarchShader.setTarget(&gbuffer.getLitColourTarget());
+    raymarchShader.clear(context);
 
     // Raymarch!
     raymarchShader.bindShader(context, haboobVolume.getShaderView());
@@ -377,13 +389,23 @@ namespace Haboob
     TracyD3D11Zone(tcyCtx, "D3DFrameMirror");
     ZoneNamed(RenderMirror, true);
 
-    device.clearBackBuffer();
-    device.setBackBufferTarget();
+    auto context = device.getContext().Get();
+
+    // Set up states for copying
     device.setRasterState(DisplayDevice::RasterFlags::RASTER_STATE_DEFAULT);
     device.setDepthEnabled(false);
     RenderTarget::copyShader.setProjectionMatrix(device.getOrthoMatrix());
 
-    auto context = device.getContext().Get();
+    // Copy from the raymarch texture output to the lit buffer
+    {
+      ID3D11RenderTargetView* litTarget = gbuffer.getLitColourTarget().getRenderTarget();
+      context->OMSetRenderTargets(1, &litTarget, nullptr);
+    }
+    raymarchShader.mirror(context);
+
+    // Copy from lit buffer to backbuffer
+    device.clearBackBuffer();
+    device.setBackBufferTarget();
     gbuffer.finalLitPass(context);
     gbuffer.renderFromLit(context);
   }
@@ -530,6 +552,7 @@ namespace Haboob
     renderScene = true;
     coneTrace = true;
     manualMarch = false;
+    showBoundingBoxes = false;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -697,6 +720,10 @@ namespace Haboob
         ->setName("Render Scene"));
       renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool, nullptr, &renderHaboob))
         ->setName("Render Haboob"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowBoundingBoxes", "If the renderer should display all bounding boxes", { "sbb" }),
+        &showBoundingBoxes))
+        ->setName("Show Bounding Boxes"));
     }
 
     {

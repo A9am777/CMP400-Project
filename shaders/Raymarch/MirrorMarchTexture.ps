@@ -1,0 +1,18 @@
+#include "../Utility/Globals.lib"
+#include "../Utility/MeshCommon.lib"
+
+Texture2D texture0 : register(t0);
+SamplerState sampler0 : register(s0);
+
+struct InputType
+{
+  float4 position : SV_POSITION;
+  float2 uv : TEXCOORD0;
+};
+
+float4 main(InputType input) : SV_TARGET
+{
+	// Simply return a sample from the texture
+  // (more complex behaviour may be performed here)
+  return texture0.Sample(sampler0, input.uv);
+}

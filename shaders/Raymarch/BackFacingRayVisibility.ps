@@ -1,0 +1,26 @@
+#include "../Utility/MeshCommon.lib"
+#include "../Lighting/GBuffer.lib"
+
+struct InputType
+{
+  float4 position : SV_POSITION;
+  float4 screenPosition : POSITION0; // Actually normalised dev coords
+  float2 uv : TEXCOORD0;
+  float3 normal : NORMAL;
+  float3 worldPosition : POSITION1;
+};
+
+Texture2D normalDepthTexture : register(t0);
+SamplerState sampler0 : register(s0);
+
+// This shader masks the backface of a bounding box and additively blends the extreme depth
+float4 main(InputType input) : SV_Target
+{
+  // Additive, combat initial undefined -ve value
+  float4 output = float4(.0, 1., .0, .0);
+  
+  // Either the existing depth or bound extremity
+  output.y += min(input.screenPosition.z, normalDepthTexture.Sample(sampler0, input.uv).w);
+  
+  return output;
+}

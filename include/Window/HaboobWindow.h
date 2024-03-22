@@ -108,6 +108,7 @@ namespace Haboob
     bool renderScene;
     bool coneTrace;
     bool manualMarch;
+    bool showBoundingBoxes;
 
     // Rendering device
     DisplayDevice device;

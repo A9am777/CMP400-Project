@@ -10,7 +10,7 @@ namespace Haboob
     transformations.viewMatrix              = XMMatrixIdentity();
   }
 
-  void Camera::setProjection(XMMATRIX& matrix)
+  void Camera::setProjection(const XMMATRIX& matrix)
   {
     transformations.projectionMatrix = matrix;
     transformations.inverseProjectionMatrix = XMMatrixInverse(nullptr, matrix);
@@ -18,7 +18,7 @@ namespace Haboob
     recomputeInverseViewProjection();
   }
 
-  void Camera::setView(XMMATRIX& matrix)
+  void Camera::setView(const XMMATRIX& matrix)
   {
     transformations.viewMatrix = matrix;
 

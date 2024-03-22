@@ -10,7 +10,9 @@ namespace Haboob
   RaymarchVolumeShader::RaymarchVolumeShader()
   {
     computeShader = new Shader(Shader::Type::Compute, L"Raymarch/MarchVolume");
+    mirrorPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/MirrorMarchTexture");
     renderTarget = nullptr;
+    boundingBox = nullptr;
     buildSpectralMatrices();
   }
 
@@ -24,6 +26,8 @@ namespace Haboob
     HRESULT result = S_OK;
 
     result = computeShader->initShader(device, manager);
+    Firebreak(result);
+    result = mirrorPixelShader->initShader(device, manager);
     Firebreak(result);
 
     // Create the raymarch info buffer
@@ -59,20 +63,38 @@ namespace Haboob
       Firebreak(result);
     }
 
+    // Create the additive blend state (for ray cull optimisations)
+    {
+      D3D11_BLEND_DESC blendDesc;
+      for (auto i = 0; i < 8; ++i)
+      {
+        blendDesc.RenderTarget[i] = D3D11_RENDER_TARGET_BLEND_DESC();
+        blendDesc.RenderTarget[i].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+        blendDesc.RenderTarget[i].BlendEnable = true;
+        blendDesc.RenderTarget[i].BlendOp = D3D11_BLEND_OP_ADD;
+        blendDesc.RenderTarget[i].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+        blendDesc.RenderTarget[i].SrcBlend = D3D11_BLEND_ONE;
+        blendDesc.RenderTarget[i].DestBlend = D3D11_BLEND_ONE;
+        blendDesc.RenderTarget[i].SrcBlendAlpha = D3D11_BLEND_ONE;
+        blendDesc.RenderTarget[i].DestBlendAlpha = D3D11_BLEND_ONE;
+      }
+      result = device->CreateBlendState(&blendDesc, additiveBlend.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
     return result;
   }
 
   void RaymarchVolumeShader::bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource)
   {
     computeShader->bindShader(context);
-    ID3D11UnorderedAccessView* accessView = renderTarget->getComputeView();
+    ID3D11UnorderedAccessView* accessView = rayTarget.getComputeView();
     context->CSSetUnorderedAccessViews(0, 1, &accessView, 0);
     context->CSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
-
     // Update and mirror march data
     {
-      marchInfo.outputHorizontalStep = 1.f / float(renderTarget->getWidth());
-      marchInfo.outputVerticalStep = 1.f / float(renderTarget->getHeight());
+      marchInfo.outputHorizontalStep = 1.f / float(rayTarget.getWidth());
+      marchInfo.outputVerticalStep = 1.f / float(rayTarget.getHeight());
 
       D3D11_MAPPED_SUBRESOURCE mapped;
       HRESULT result = context->Map(marchBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
@@ -87,6 +109,8 @@ namespace Haboob
 
     context->CSSetSamplers(0, 1, marchSamplerState.GetAddressOf());
     context->CSSetShaderResources(0, 1, &densityTexResource);
+
+    context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
   }
 
   void RaymarchVolumeShader::unbindShader(ID3D11DeviceContext* context)
@@ -100,12 +124,63 @@ namespace Haboob
     context->CSSetConstantBuffers(2, 1, (ID3D11Buffer**)&nullpo);
     context->CSSetSamplers(0, 1, (ID3D11SamplerState**)&nullpo);
     context->CSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
+
+    context->OMSetBlendState(nullptr, nullptr, ~0);
+  }
+
+  void RaymarchVolumeShader::mirror(ID3D11DeviceContext* context)
+  {
+    auto& copyShader = RenderTarget::copyShader;
+
+    copyShader.setViewport(renderTarget->getViewport());
+    copyShader.bindShader(context);
+    // Overwrite the PS
+    mirrorPixelShader->bindShader(context);
+
+    ID3D11ShaderResourceView* textureView = rayTarget.getShaderView();
+    context->PSSetShaderResources(0, 1, &textureView);
+
+    context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
+    copyShader.render(context);
+    context->OMSetBlendState(nullptr, nullptr, ~0);
+
+    textureView = nullptr;
+    context->PSSetShaderResources(0, 1, &textureView);
+
+    mirrorPixelShader->unbindShader(context);
+  }
+
+  void RaymarchVolumeShader::clear(ID3D11DeviceContext* context)
+  {
+    rayTarget.clear(context, RenderTarget::defaultBlack);
+  }
+
+  HRESULT RaymarchVolumeShader::createIntermediate(ID3D11Device* device, UInt width, UInt height)
+  {
+    // Currently no need to use custom texture descriptions
+    HRESULT result = S_OK;
+
+    result = rayTarget.create(device, width, height);
+    Firebreak(result);
+
+    return result;
+  }
+
+  HRESULT RaymarchVolumeShader::resizeIntermediate(ID3D11Device* device, UInt width, UInt height)
+  {
+    // Currently no need to use custom texture descriptions
+    HRESULT result = S_OK;
+
+    result = rayTarget.resize(device, width, height);
+    Firebreak(result);
+
+    return result;
   }
 
   void RaymarchVolumeShader::render(ID3D11DeviceContext* context) const
   {
     static constexpr UInt groupSize = 16;
-    computeShader->dispatch(context, renderTarget->getWidth() / groupSize, renderTarget->getHeight() / groupSize);
+    computeShader->dispatch(context, rayTarget.getWidth() / groupSize, rayTarget.getHeight() / groupSize);
   }
 
   void RaymarchVolumeShader::buildSpectralMatrices()

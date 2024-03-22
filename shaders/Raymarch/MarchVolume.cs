@@ -310,5 +310,5 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Apply scattering to incoming background irradiance
   screenOut[threadID.xy] *= blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte)); //TODO: BP is not very good here
   // Add irradiance from the volume itself
-  screenOut[threadID.xy] += float4(integrate(irradianceInteX) + integrate(irradianceInteX2), integrate(irradianceInteY), integrate(irradianceInteZ), .0);
+  screenOut[threadID.xy] += float4(integrate(irradianceInteX) + integrate(irradianceInteX2), integrate(irradianceInteY), integrate(irradianceInteZ), 1.);
 }

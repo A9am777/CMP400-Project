@@ -17,6 +17,7 @@ namespace Haboob
     MeshInstance(Mesh<VertexT>* mesh = nullptr);
 
     inline void setMesh(Mesh<VertexT>* newMesh) { baseMesh = newMesh; }
+    inline void setVisible(bool isVisible) { visible = isVisible; }
     void buildTransform();
 
     const inline XMMATRIX& getTransform() { return transform; }
@@ -33,6 +34,7 @@ namespace Haboob
     XMFLOAT3 position;
     XMFLOAT3 scale;
     XMFLOAT4 quat;
+    bool visible;
   };
 
   template<typename VertexT> class MeshRenderer
