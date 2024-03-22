@@ -93,10 +93,9 @@ void append(inout SimpsonsIntegrator inte, float value)
   inte.count++;
 }
 
-float integrate(inout SimpsonsIntegrator inte)
+float integrate(inout SimpsonsIntegrator inte, float range)
 {
-  // Note: sample count must always be even
-  float stepSize = 1. / float(inte.count);
+  float stepSize = range / float(inte.count);
   float result = inte.firstTerm + inte.lastTerm;
   result += 4. * inte.odds;
   result += 2 * (inte.evens - inte.lastTerm);

@@ -238,12 +238,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     params.marchZStep = rayMaxDepth / float(params.iterations);
   #endif
   
-  // Exit now if possible
-  if(params.mask)
-  {
-    //return;
-  }
-  
   // Jump ray forward
   march(ray, params.initialStep);
   
@@ -275,8 +269,8 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     append(absorptionInte, densitySample);
     append(angstromInte, angstromSample);
     
-    float referenceOpticalDepth = opticalInfo.attenuationFactor * integrate(absorptionInte);
-    float referenceAngstromAbsorption = opticalInfo.absorptionAngstromExponent * integrate(angstromInte);
+    float referenceOpticalDepth = opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance);
+    float referenceAngstromAbsorption = opticalInfo.absorptionAngstromExponent * integrate(angstromInte, ray.travelDistance);
     
     // TODO: this is the non-constant second path and needs to be replaced!
     // Lets assume it is the current density along the ray for now
@@ -306,10 +300,10 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Debug/testing outputs
   #if SHOW_DENSITY
-    screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte), .0, .0, 1.);
+    screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance), .0, .0, 1.);
     return;
   #elif SHOW_ANGSTROM
-    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte), .0, .0, 1.);
+    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte, ray.travelDistance), .0, .0, 1.);
     return;
   #elif SHOW_SAMPLE_LEVEL
     float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x), .0, 1.);
@@ -324,5 +318,5 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
 
   // TODO: background irradiance is no longer computed here
   // Add irradiance from the volume itself
-  screenOut[threadID.xy] = float4(integrate(irradianceInteX) + integrate(irradianceInteX2), integrate(irradianceInteY), integrate(irradianceInteZ), 1.);
+  screenOut[threadID.xy] = float4(integrate(irradianceInteX, ray.travelDistance) + integrate(irradianceInteX2, ray.travelDistance), integrate(irradianceInteY, ray.travelDistance), integrate(irradianceInteZ, ray.travelDistance), 1.);
 }
