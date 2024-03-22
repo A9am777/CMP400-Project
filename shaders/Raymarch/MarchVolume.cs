@@ -12,6 +12,7 @@
   #define SHOW_ANGSTROM 0
   #define SHOW_SAMPLE_LEVEL 0
   #define SHOW_MASK 0
+  #define SHOW_RAY_TRAVEL 0
 #endif
 
 RWTexture2D<float4> screenOut : register(u0);
@@ -201,9 +202,11 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Form a ray from the screen
   Ray ray;
-  ray.pos = float4(normScreen, 0, 1.);
+  float rayMaxDepth = .0;
+  
+  ray.pos = float4(normScreen, rayParams.x, 1.);
   {
-    float4 directionPointTarget = float4(normScreen, ZDirectionTest, 1.);
+    float4 directionPointTarget = float4(normScreen, rayParams.y, 1.);
     
     // Convert both points to world space
     ray.pos = mul(ray.pos, camera.inverseViewProjectionMatrix);
@@ -212,21 +215,17 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     fromHomogeneous(directionPointTarget);
     
     // Create a normalised direction vector
-    ray.dir = normalize(directionPointTarget - ray.pos);
+    ray.dir = directionPointTarget - ray.pos;
+    rayMaxDepth = length(ray.dir);
+    ray.dir /= rayMaxDepth;
   }
   ray.colour = float4(1., 1., 1., 0.);
   ray.travelDistance = .0;
   
-  // Bounding sphere
-  Sphere sphere;
-  sphere.pos = float4(0., 0., 0., 1.);
-  
   // Sampling cube
   Cube cube;
   cube.size = float3(3., 3., 3.);
-  cube.pos = float4(sphere.pos.xyz - cube.size * float3(.5,.5,.5), 1.); // Shift from centre origin to AABB
-  
-  sphere.sqrRadius = dot(cube.size * float3(.5, .5, .5), cube.size * float3(.5, .5, .5)); // Encapsulate cube
+  cube.pos = float4(-cube.size * float3(.5,.5,.5), 1.); // Shift from centre origin to AABB
   
   // Set march params
   MarchParams params;
@@ -235,8 +234,8 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   params.initialStep = dispatchInfo.initialZStep;
   params.mask = 0;
   #if !MARCH_MANUAL
-    // Use the bounding sphere to approximate better params
-    determineSphereParams(params, ray, sphere);
+    params.initialStep = .0;
+    params.marchZStep = rayMaxDepth / float(params.iterations);
   #endif
   
   // Exit now if possible
@@ -307,22 +306,23 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Debug/testing outputs
   #if SHOW_DENSITY
-    screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte), .0, .0, .0);
+    screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte), .0, .0, 1.);
     return;
   #elif SHOW_ANGSTROM
-    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte), .0, .0, .0);
+    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte), .0, .0, 1.);
     return;
   #elif SHOW_SAMPLE_LEVEL
-    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x), .0, .0);
+    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x), .0, 1.);
     ray.travelDistance = params.initialStep;
     sampleLevelInfo.x = getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x);
     screenOut[threadID.xy] = sampleLevelInfo / 8.;
     return;
+  #elif SHOW_RAY_TRAVEL
+    screenOut[threadID.xy] = float4(ray.travelDistance, 1., 1., 1.);
+    return;
   #endif 
 
   // TODO: background irradiance is no longer computed here
-  // Apply scattering to incoming background irradiance
-  screenOut[threadID.xy] *= blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte)); //TODO: BP is not very good here
   // Add irradiance from the volume itself
   screenOut[threadID.xy] = float4(integrate(irradianceInteX) + integrate(irradianceInteX2), integrate(irradianceInteY), integrate(irradianceInteZ), 1.);
 }

@@ -78,10 +78,6 @@ struct SimpsonsIntegrator // Simpsons rule
 
 static float PI = radians(180.);
 
-// The depth to find the ray 'end' at
-#define ZDirectionTest .01
-
-
 void append(inout SimpsonsIntegrator inte, float value)
 {
   inte.lastTerm = value;

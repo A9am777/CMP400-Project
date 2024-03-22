@@ -23,7 +23,7 @@ namespace Haboob
 
   void GBuffer::clear(ID3D11DeviceContext* context)
   {
-    static float normalClearColour[4] = { .0f, .0f, -1.f, .0f };
+    static float normalClearColour[4] = { .0f, .0f, -1.f, 1.f };
 
     diffuseTarget.clear(context, RenderTarget::defaultBlack);
     normalDepthTarget.clear(context, normalClearColour);

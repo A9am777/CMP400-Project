@@ -260,6 +260,7 @@ namespace Haboob
       shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
       shaderManager.setMacro("SHOW_SAMPLE_LEVEL", std::to_string(showSampleLevel));
       shaderManager.setMacro("SHOW_MASK", std::to_string(showMasks));
+      shaderManager.setMacro("SHOW_RAY_TRAVEL", std::to_string(showRayTravel));
     }
 
     shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
@@ -558,6 +559,7 @@ namespace Haboob
     manualMarch = false;
     showBoundingBoxes = false;
     showMasks = false;
+    showRayTravel = false;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -733,6 +735,10 @@ namespace Haboob
         new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowMasks", "If the renderer should display raymarch masks", { "smk" }),
         &showMasks))
         ->setName("Show Masks"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowRayTravel", "If the renderer should display the distance rays have travelled", { "srt" }),
+        &showRayTravel))
+        ->setName("Show Ray Travel"));
     }
 
     {
