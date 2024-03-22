@@ -14,10 +14,10 @@ struct InputType
 float4 main(InputType input) : SV_Target
 {
   // Additive, combat initial undefined -ve value
-  float4 output = float4(1., .0, .0, .0);
+  float4 output = float4(1., .0, .0, 1.);
   
   // The bound depth. Note that a camera *within* the bounds should exhibit different behaviour
-  output.y += input.screenPosition.z;
+  output.x += input.screenPosition.z;
   
   return output;
 }

@@ -2,6 +2,7 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/RenderTarget.h"
 #include "Rendering/Geometry/MeshRenderer.h"
+#include <Rendering/Textures/GBuffer.h>
 
 namespace Haboob
 {
@@ -132,7 +133,7 @@ namespace Haboob
     void mirror(ID3D11DeviceContext* context);
 
     // TODO: TEMP
-    void clear(ID3D11DeviceContext* context);
+    void optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer);
 
     HRESULT createIntermediate(ID3D11Device* device, UInt width, UInt height);
     HRESULT resizeIntermediate(ID3D11Device* device, UInt width, UInt height);
@@ -156,6 +157,9 @@ namespace Haboob
     // Optimisations
     MeshInstance* boundingBox;
     ComPtr<ID3D11BlendState> additiveBlend;
+    ComPtr<ID3D11SamplerState> pixelSamplerState;
+    Shader* frontRayVisibilityPixelShader;
+    Shader* backRayVisibilityPixelShader;
 
     // Intermediates
     RenderTarget rayTarget; // Used to store ray information between stages

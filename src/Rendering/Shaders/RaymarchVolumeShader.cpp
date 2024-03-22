@@ -11,6 +11,9 @@ namespace Haboob
   {
     computeShader = new Shader(Shader::Type::Compute, L"Raymarch/MarchVolume");
     mirrorPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/MirrorMarchTexture");
+    frontRayVisibilityPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/FrontFacingRayVisibility");
+    backRayVisibilityPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/BackFacingRayVisibility");
+
     renderTarget = nullptr;
     boundingBox = nullptr;
     buildSpectralMatrices();
@@ -28,6 +31,10 @@ namespace Haboob
     result = computeShader->initShader(device, manager);
     Firebreak(result);
     result = mirrorPixelShader->initShader(device, manager);
+    Firebreak(result);
+    result = frontRayVisibilityPixelShader->initShader(device, manager);
+    Firebreak(result);
+    result = backRayVisibilityPixelShader->initShader(device, manager);
     Firebreak(result);
 
     // Create the raymarch info buffer
@@ -60,6 +67,24 @@ namespace Haboob
       volumeSamplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
       
       result = device->CreateSamplerState(&volumeSamplerDesc, marchSamplerState.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+
+    // Create a pixel (point) sampler
+    {
+      D3D11_SAMPLER_DESC pixelSamplerDesc;
+      ZeroMemory(&pixelSamplerDesc, sizeof(D3D11_SAMPLER_DESC));
+
+      pixelSamplerDesc.AddressU = pixelSamplerDesc.AddressV = pixelSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+
+      pixelSamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+      pixelSamplerDesc.MipLODBias = 0.0f;
+      pixelSamplerDesc.MaxAnisotropy = 1;
+      pixelSamplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+      pixelSamplerDesc.MinLOD = 0;
+      pixelSamplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+      result = device->CreateSamplerState(&pixelSamplerDesc, pixelSamplerState.ReleaseAndGetAddressOf());
       Firebreak(result);
     }
 
@@ -150,9 +175,54 @@ namespace Haboob
     mirrorPixelShader->unbindShader(context);
   }
 
-  void RaymarchVolumeShader::clear(ID3D11DeviceContext* context)
+  void RaymarchVolumeShader::optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer)
   {
-    rayTarget.clear(context, RenderTarget::defaultBlack);
+    auto context = device.getContext().Get();
+    renderer.bind(context);
+
+    // -ve values signal "not visible" or "fragment component not updated"
+    float rayClearColour[4] = { -1.f, -1.f, -1.f, -1.f };
+    rayTarget.clear(context, rayClearColour);
+    rayTarget.setTarget(context, device.getDepthBuffer());
+    context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
+
+    // TODO: if the camera is within the bounds, the clear colour should NOT be -ve
+
+    boundingBox->setVisible(true);
+
+    // Render front face
+    frontRayVisibilityPixelShader->bindShader(context);
+    renderer.draw(context, boundingBox);
+    
+    // Render back face
+    {
+      // Prepare to roll back to the previous raster state
+      auto previousRasterState = device.getRasterState();
+      
+      // Cull front face and render the backface as a 'mask'
+      device.setCullBackface(false); 
+      device.setCull(true);
+      device.setDepthEnabled(false);
+
+      // Need to read the depth so either the bounds max or depth is rendered!
+      ID3D11ShaderResourceView* textureView = gbuffer.getNormalDepthTarget().getShaderView();
+      context->PSSetShaderResources(0, 1, &textureView);
+      context->PSSetSamplers(0, 1, pixelSamplerState.GetAddressOf());
+      backRayVisibilityPixelShader->bindShader(context);
+
+      renderer.draw(context, boundingBox);
+
+      void* nullpo = nullptr;
+      context->PSSetSamplers(0, 1, (ID3D11SamplerState**)&nullpo);
+      context->PSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
+
+      device.setRasterState(previousRasterState);
+    }
+
+    renderer.unbind(context);
+
+    context->OMSetBlendState(nullptr, nullptr, ~0);
+    device.setBackBufferTarget();
   }
 
   HRESULT RaymarchVolumeShader::createIntermediate(ID3D11Device* device, UInt width, UInt height)

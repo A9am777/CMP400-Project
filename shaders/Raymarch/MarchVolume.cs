@@ -11,6 +11,7 @@
   #define SHOW_DENSITY 0
   #define SHOW_ANGSTROM 0
   #define SHOW_SAMPLE_LEVEL 0
+  #define SHOW_MASK 0
 #endif
 
 RWTexture2D<float4> screenOut : register(u0);
@@ -185,6 +186,19 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   float2 normScreen = float2(normToSigned((float(threadID.x) + .5f) * dispatchInfo.outputHorizontalStep),
                               -normToSigned((float(threadID.y) + .5f) * dispatchInfo.outputVerticalStep));
   
+  // Fetch parameters that have been fed in
+  float4 rayParams = screenOut[threadID.xy];
+  // Mask fragments
+  if(rayParams.x < 0 || rayParams.y < 0) 
+  { 
+    #if SHOW_MASK
+    screenOut[threadID.xy] = float4(100., 100., 100., 100.);
+    #else
+    screenOut[threadID.xy] = float4(.0, .0, .0, .0);
+    #endif
+    return; 
+  }
+  
   // Form a ray from the screen
   Ray ray;
   ray.pos = float4(normScreen, 0, 1.);
@@ -228,7 +242,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Exit now if possible
   if(params.mask)
   {
-    return;
+    //return;
   }
   
   // Jump ray forward
@@ -306,9 +320,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     return;
   #endif 
 
-  
+  // TODO: background irradiance is no longer computed here
   // Apply scattering to incoming background irradiance
   screenOut[threadID.xy] *= blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte)); //TODO: BP is not very good here
   // Add irradiance from the volume itself
-  screenOut[threadID.xy] += float4(integrate(irradianceInteX) + integrate(irradianceInteX2), integrate(irradianceInteY), integrate(irradianceInteZ), 1.);
+  screenOut[threadID.xy] = float4(integrate(irradianceInteX) + integrate(irradianceInteX2), integrate(irradianceInteY), integrate(irradianceInteZ), 1.);
 }

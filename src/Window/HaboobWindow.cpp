@@ -47,7 +47,7 @@ namespace Haboob
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, requiredWidth, requiredHeight);
-      raymarchShader.createIntermediate(dev, requiredWidth >> 1, requiredHeight >> 1);
+      raymarchShader.createIntermediate(dev, requiredWidth, requiredHeight); // TODO: upscale :(
       light.create(dev, 1024, 1024);
 
       // Initialise all shaders
@@ -259,6 +259,7 @@ namespace Haboob
       shaderManager.setMacro("SHOW_DENSITY", std::to_string(showDensity));
       shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
       shaderManager.setMacro("SHOW_SAMPLE_LEVEL", std::to_string(showSampleLevel));
+      shaderManager.setMacro("SHOW_MASK", std::to_string(showMasks));
     }
 
     shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
@@ -294,7 +295,7 @@ namespace Haboob
   void HaboobWindow::adjustProjection()
   {
     gbuffer.resize(device.getDevice().Get(), requiredWidth, requiredHeight);
-    raymarchShader.resizeIntermediate(device.getDevice().Get(), requiredWidth >> 1, requiredHeight >> 1);
+    raymarchShader.resizeIntermediate(device.getDevice().Get(), requiredWidth, requiredHeight);
 
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
@@ -372,11 +373,14 @@ namespace Haboob
     // Basic lit pass
     gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), light.getShadowSampler().Get());
 
+    // Initial raymarch optimisation passes
+    raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer);
+
+    // Set up requirements for the proper pass
     scene.setCamera(&mainCamera);
     raymarchShader.setCameraBuffer(scene.getCameraBuffer());
     raymarchShader.setLightBuffer(light.getLightBuffer());
     raymarchShader.setTarget(&gbuffer.getLitColourTarget());
-    raymarchShader.clear(context);
 
     // Raymarch!
     raymarchShader.bindShader(context, haboobVolume.getShaderView());
@@ -553,6 +557,7 @@ namespace Haboob
     coneTrace = true;
     manualMarch = false;
     showBoundingBoxes = false;
+    showMasks = false;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -724,6 +729,10 @@ namespace Haboob
         new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowBoundingBoxes", "If the renderer should display all bounding boxes", { "sbb" }),
         &showBoundingBoxes))
         ->setName("Show Bounding Boxes"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowMasks", "If the renderer should display raymarch masks", { "smk" }),
+        &showMasks))
+        ->setName("Show Masks"));
     }
 
     {
