@@ -6,6 +6,7 @@
   #define APPLY_HG 1
   #define APPLY_SPECTRAL 1
   #define APPLY_CONE_TRACE 1
+  #define APPLY_UPSCALE 1
   #define MARCH_MANUAL 0
   #define MARCH_STEP_COUNT 24
   #define SHOW_DENSITY 0
@@ -88,6 +89,9 @@ bool inSphere(in Ray ray, in Sphere sphere)
 float getConeSampleLevel(in Ray ray, float worldToTexels)
 {
   float rayRadius = dispatchInfo.pixelRadius + dispatchInfo.pixelRadiusDelta * ray.travelDistance;
+  #if APPLY_UPSCALE
+  rayRadius *= 2.;
+  #endif
   return log2(rayRadius * worldToTexels);
 }
 
@@ -183,12 +187,31 @@ float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
 [numthreads(16, 16, 1)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
+  #if APPLY_UPSCALE
+  // Using 1/4 rays over 1/4 of the screen
+  int2 screenPosition = threadID.xy * 2;
+  
   // Actually a matrix is probably better here, maybe even rasterisation pass?
-  float2 normScreen = float2(normToSigned((float(threadID.x) + .5f) * dispatchInfo.outputHorizontalStep),
-                              -normToSigned((float(threadID.y) + .5f) * dispatchInfo.outputVerticalStep));
+  float2 normScreen = float2(normToSigned((float(screenPosition.x + 1)) * dispatchInfo.outputHorizontalStep),
+                              -normToSigned((float(screenPosition.y + 1)) * dispatchInfo.outputVerticalStep));
+  
+  // Fetch parameters that have been fed in (over the 2x2 pixel area)
+  float4 rayParams = screenOut[screenPosition];
+  rayParams += screenOut[screenPosition + int2(1, 0)];
+  rayParams += screenOut[screenPosition + int2(0, 1)];
+  rayParams += screenOut[screenPosition + int2(1, 1)];
+  rayParams *= .25;
+  #else
+  // Using all rays over the screen
+  int2 screenPosition = threadID.xy;
+  
+  float2 normScreen = float2(normToSigned((float(screenPosition.x) + .5) * dispatchInfo.outputHorizontalStep),
+                              -normToSigned((float(screenPosition.y) + .5) * dispatchInfo.outputVerticalStep));
   
   // Fetch parameters that have been fed in
-  float4 rayParams = screenOut[threadID.xy];
+  float4 rayParams = screenOut[screenPosition];
+  #endif
+  
   // Mask fragments
   if(rayParams.x < 0 || rayParams.y < 0) 
   { 

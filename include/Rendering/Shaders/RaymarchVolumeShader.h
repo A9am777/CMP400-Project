@@ -144,6 +144,7 @@ namespace Haboob
     inline void setCameraBuffer(ComPtr<ID3D11Buffer> buffer) { cameraBuffer = buffer; }
     inline void setLightBuffer(ComPtr<ID3D11Buffer> buffer) { lightBuffer = buffer; }
     inline void setBox(MeshInstance<VertexType>* boxInstance) { boundingBox = boxInstance; }
+    inline void setShouldUpscale(bool upscale) { shouldUpscale = upscale; }
 
     inline MeshInstance<VertexType>* getBox() { return boundingBox; }
     inline MarchVolumeDispatchInfo& getMarchInfo() { return marchInfo; }
@@ -160,6 +161,7 @@ namespace Haboob
     ComPtr<ID3D11SamplerState> pixelSamplerState;
     Shader* frontRayVisibilityPixelShader;
     Shader* backRayVisibilityPixelShader;
+    bool shouldUpscale;
 
     // Intermediates
     RenderTarget rayTarget; // Used to store ray information between stages

@@ -1,6 +1,10 @@
 #include "../Utility/Globals.lib"
 #include "../Utility/MeshCommon.lib"
 
+#ifndef MACRO_MANAGED
+  #define APPLY_UPSCALE 1
+#endif
+
 Texture2D texture0 : register(t0);
 SamplerState sampler0 : register(s0);
 
@@ -12,7 +16,13 @@ struct InputType
 
 float4 main(InputType input) : SV_TARGET
 {
-	// Simply return a sample from the texture
   // (more complex behaviour may be performed here)
+  
+  #if APPLY_UPSCALE
+  // Simply return a sample from the texture (top left corner)
+  return texture0.Sample(sampler0, input.uv * .5);
+  #else
+  // Simply return a sample from the texture
   return texture0.Sample(sampler0, input.uv);
+  #endif
 }

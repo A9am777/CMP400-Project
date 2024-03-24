@@ -14,6 +14,7 @@ namespace Haboob
     frontRayVisibilityPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/FrontFacingRayVisibility");
     backRayVisibilityPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/BackFacingRayVisibility");
 
+    shouldUpscale = true;
     renderTarget = nullptr;
     boundingBox = nullptr;
     buildSpectralMatrices();
@@ -22,6 +23,9 @@ namespace Haboob
   RaymarchVolumeShader::~RaymarchVolumeShader()
   {
     delete computeShader; computeShader = nullptr;
+    delete mirrorPixelShader; mirrorPixelShader = nullptr;
+    delete frontRayVisibilityPixelShader; frontRayVisibilityPixelShader = nullptr;
+    delete backRayVisibilityPixelShader; backRayVisibilityPixelShader = nullptr;
   }
 
   HRESULT RaymarchVolumeShader::initShader(ID3D11Device* device, ShaderManager* manager)
@@ -250,7 +254,11 @@ namespace Haboob
   void RaymarchVolumeShader::render(ID3D11DeviceContext* context) const
   {
     static constexpr UInt groupSize = 16;
-    computeShader->dispatch(context, rayTarget.getWidth() / groupSize, rayTarget.getHeight() / groupSize);
+
+    // Render with a quarter of rays if upscaling
+    XMUINT2 rayCount = shouldUpscale ? XMUINT2(rayTarget.getWidth() >> 1, rayTarget.getHeight() >> 1) : XMUINT2(rayTarget.getWidth(), rayTarget.getHeight());
+    // Divide rays into groups plus an extra padding group
+    computeShader->dispatch(context, 1 + rayCount.x / groupSize, 1 + rayCount.y / groupSize);
   }
 
   void RaymarchVolumeShader::buildSpectralMatrices()

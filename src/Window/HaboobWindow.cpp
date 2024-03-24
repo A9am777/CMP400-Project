@@ -252,6 +252,7 @@ namespace Haboob
       shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
       shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
       shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
+      shaderManager.setMacro("APPLY_UPSCALE", std::to_string(upscaleTracing));
       shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
     }
 
@@ -280,6 +281,7 @@ namespace Haboob
     }
 
     raymarchShader.getBox()->setVisible(showBoundingBoxes);
+    raymarchShader.setShouldUpscale(upscaleTracing);
   }
 
   void HaboobWindow::createD3D()
@@ -556,6 +558,7 @@ namespace Haboob
     renderHaboob = false;
     renderScene = true;
     coneTrace = true;
+    upscaleTracing = true;
     manualMarch = false;
     showBoundingBoxes = false;
     showMasks = false;
@@ -922,6 +925,10 @@ namespace Haboob
         new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyConeTrace", "If cone tracing should be used for anti-aliasing", { "uct" }), 
         &coneTrace))
         ->setName("Apply Cone Tracing"));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyUpscaleTrace", "If upscaling should be used for raymarching", { "uqt" }),
+        &upscaleTracing))
+        ->setName("Apply Upscale Tracing"));
     }
   }
   void HaboobWindow::show()
