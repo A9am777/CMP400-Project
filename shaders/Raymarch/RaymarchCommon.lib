@@ -5,8 +5,8 @@
 
 struct MarchVolumeDispatchInfo
 {
-  float outputHorizontalStep; // View step per horizontal thread
-  float outputVerticalStep; // View step per vertical thread
+  float outputHorizontalStep; // View step per horizontal thread (UNUSED)
+  float outputVerticalStep; // View step per vertical thread (UNUSED)
   float initialZStep; // Distance to initially jump in Z
   float marchZStep; // Distance to typically jump in Z
  

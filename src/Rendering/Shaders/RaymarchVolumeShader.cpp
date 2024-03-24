@@ -105,9 +105,27 @@ namespace Haboob
         blendDesc.RenderTarget[i].SrcBlend = D3D11_BLEND_ONE;
         blendDesc.RenderTarget[i].DestBlend = D3D11_BLEND_ONE;
         blendDesc.RenderTarget[i].SrcBlendAlpha = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].DestBlendAlpha = D3D11_BLEND_ONE;
+        blendDesc.RenderTarget[i].DestBlendAlpha = D3D11_BLEND_ZERO;
       }
       result = device->CreateBlendState(&blendDesc, additiveBlend.ReleaseAndGetAddressOf());
+      Firebreak(result);
+    }
+    // Create the additive blend state (for overlaying)
+    {
+      D3D11_BLEND_DESC blendDesc;
+      for (auto i = 0; i < 8; ++i)
+      {
+        blendDesc.RenderTarget[i] = D3D11_RENDER_TARGET_BLEND_DESC();
+        blendDesc.RenderTarget[i].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+        blendDesc.RenderTarget[i].BlendEnable = true;
+        blendDesc.RenderTarget[i].BlendOp = D3D11_BLEND_OP_ADD;
+        blendDesc.RenderTarget[i].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+        blendDesc.RenderTarget[i].SrcBlend = D3D11_BLEND_ONE;
+        blendDesc.RenderTarget[i].DestBlend = D3D11_BLEND_ONE;
+        blendDesc.RenderTarget[i].SrcBlendAlpha = D3D11_BLEND_ONE;
+        blendDesc.RenderTarget[i].DestBlendAlpha = D3D11_BLEND_ZERO;
+      }
+      result = device->CreateBlendState(&blendDesc, additiveOverlayBlend.ReleaseAndGetAddressOf());
       Firebreak(result);
     }
 
@@ -169,7 +187,7 @@ namespace Haboob
     ID3D11ShaderResourceView* textureView = rayTarget.getShaderView();
     context->PSSetShaderResources(0, 1, &textureView);
 
-    context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
+    context->OMSetBlendState(additiveOverlayBlend.Get(), nullptr, ~0);
     copyShader.render(context);
     context->OMSetBlendState(nullptr, nullptr, ~0);
 
@@ -185,7 +203,7 @@ namespace Haboob
     renderer.bind(context);
 
     // -ve values signal "not visible" or "fragment component not updated"
-    float rayClearColour[4] = { -1.f, -1.f, -1.f, -1.f };
+    float rayClearColour[4] = { -1.f, -1.f, .0f, .0f };
     rayTarget.clear(context, rayClearColour);
     rayTarget.setTarget(context, device.getDepthBuffer());
     context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);

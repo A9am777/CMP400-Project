@@ -158,6 +158,7 @@ namespace Haboob
     // Optimisations
     MeshInstance* boundingBox;
     ComPtr<ID3D11BlendState> additiveBlend;
+    ComPtr<ID3D11BlendState> additiveOverlayBlend;
     ComPtr<ID3D11SamplerState> pixelSamplerState;
     Shader* frontRayVisibilityPixelShader;
     Shader* backRayVisibilityPixelShader;

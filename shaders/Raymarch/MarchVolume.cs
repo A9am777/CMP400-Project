@@ -191,10 +191,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Using 1/4 rays over 1/4 of the screen
   int2 screenPosition = threadID.xy * 2;
   
-  // Actually a matrix is probably better here, maybe even rasterisation pass?
-  float2 normScreen = float2(normToSigned((float(screenPosition.x + 1)) * dispatchInfo.outputHorizontalStep),
-                              -normToSigned((float(screenPosition.y + 1)) * dispatchInfo.outputVerticalStep));
-  
   // Fetch parameters that have been fed in (over the 2x2 pixel area)
   float4 rayParams = screenOut[screenPosition];
   rayParams += screenOut[screenPosition + int2(1, 0)];
@@ -204,9 +200,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   #else
   // Using all rays over the screen
   int2 screenPosition = threadID.xy;
-  
-  float2 normScreen = float2(normToSigned((float(screenPosition.x) + .5) * dispatchInfo.outputHorizontalStep),
-                              -normToSigned((float(screenPosition.y) + .5) * dispatchInfo.outputVerticalStep));
   
   // Fetch parameters that have been fed in
   float4 rayParams = screenOut[screenPosition];
@@ -222,6 +215,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     #endif
     return; 
   }
+  
+  // Utilise the rasterization pass to fetch screen coordinates
+  float2 normScreen = float2(rayParams.z, normToSigned(rayParams.w - 1.));
   
   // Form a ray from the screen
   Ray ray;

@@ -13,6 +13,12 @@ struct InputType
 Texture2D normalDepthTexture : register(t0);
 SamplerState sampler0 : register(s0);
 
+// Converts [-1, 1] to [0, 1]
+float signedToNorm(float norm)
+{
+  return norm * .5 + .5;
+}
+
 // This shader masks the backface of a bounding box and additively blends the extreme depth
 float4 main(InputType input) : SV_Target
 {
@@ -21,6 +27,11 @@ float4 main(InputType input) : SV_Target
   
   // Either the existing depth or bound extremity
   output.y += min(input.screenPosition.z, normalDepthTexture.Sample(sampler0, input.uv).w);
+  
+  // It is beneficial to utilise a rasterized screen position for raymarching
+  // (this shader always passes so this operation is performed here over the front facing pass)
+  output.z = input.screenPosition.x;
+  output.w = signedToNorm(input.screenPosition.y) + 1.; // Pack to bypass alpha test
   
   return output;
 }
