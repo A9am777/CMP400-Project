@@ -99,7 +99,7 @@ namespace Haboob
         scene.addObject(instance);
 
         // Haboob volume
-        instance = new Instance(&cubeMesh);
+        instance = new Instance(&sphereMesh);
         instance->getPosition() = { .0f, .0f, .0f };
         instance->getScale() = { 3.f, 3.f, 3.f };
         scene.addObject(instance);

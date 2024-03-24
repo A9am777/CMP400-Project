@@ -205,8 +205,11 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   float4 rayParams = screenOut[screenPosition];
   #endif
   
+  screenOut[threadID.xy] = float4(rayParams.x, rayParams.y, rayParams.z, 1.);
+  return;
+  
   // Mask fragments
-  if(rayParams.x < 0 || rayParams.y < 0) 
+  if(rayParams.x < 0 || rayParams.y < 0 || rayParams.x > rayParams.y) 
   { 
     #if SHOW_MASK
     screenOut[threadID.xy] = float4(100., 100., 100., 100.);
@@ -254,7 +257,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   params.mask = 0;
   #if !MARCH_MANUAL
     params.initialStep = .0;
-    params.marchZStep = rayMaxDepth / float(params.iterations);
+    params.marchZStep = 3. / float(params.iterations);
   #endif
   
   // Jump ray forward
