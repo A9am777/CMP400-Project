@@ -377,7 +377,7 @@ namespace Haboob
     gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), light.getShadowSampler().Get());
 
     // Initial raymarch optimisation passes
-    raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer);
+    raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&mainCamera.getPosition()));
 
     // Set up requirements for the proper pass
     scene.setCamera(&mainCamera);

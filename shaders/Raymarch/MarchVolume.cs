@@ -289,7 +289,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     
     // TODO: this is the non-constant second path and needs to be replaced!
     // Lets assume it is the current density along the ray for now
-    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * 4.;
+    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * 2.;
     
     // Accumulate intensity as a function of optical thickness
     float4 irradianceSample;
@@ -331,8 +331,8 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     return;
   #endif 
 
-  // Background transmission
-  float finalTransmission = max(blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance)), .1);
+  // Background transmission, assume uniform behaviour across wavelengths (use Beer-Lambert over powder)
+  float finalTransmission = blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance));
   
   // Set as irradiance from the volume with alpha = background transmission
   screenOut[threadID.xy] = float4(integrate(irradianceInteX, ray.travelDistance) + integrate(irradianceInteX2, ray.travelDistance), integrate(irradianceInteY, ray.travelDistance), integrate(irradianceInteZ, ray.travelDistance), finalTransmission);

@@ -3,6 +3,7 @@
 #include "Rendering/Textures/RenderTarget.h"
 #include "Rendering/Geometry/MeshRenderer.h"
 #include <Rendering/Textures/GBuffer.h>
+#include <Rendering/Scene/Camera.h>
 
 namespace Haboob
 {
@@ -137,7 +138,7 @@ namespace Haboob
     void mirror(ID3D11DeviceContext* context);
 
     // TODO: TEMP
-    void optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer);
+    void optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer, XMVECTOR& cameraPosition);
 
     HRESULT createIntermediate(ID3D11Device* device, UInt width, UInt height);
     HRESULT resizeIntermediate(ID3D11Device* device, UInt width, UInt height);

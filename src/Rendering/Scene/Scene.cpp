@@ -107,8 +107,8 @@ namespace Haboob
           ImGui::EndCombo();
         }
 
-        ImGui::DragFloat3((instanceName + " Position").c_str(), &meshInstance->getPosition().x);
-        ImGui::DragFloat3((instanceName + " Scale").c_str(), &meshInstance->getScale().x);
+        ImGui::DragFloat3((instanceName + " Position").c_str(), &meshInstance->getPosition().x, .05f);
+        ImGui::DragFloat3((instanceName + " Scale").c_str(), &meshInstance->getScale().x, .05f);
         
         // Decompose quaternion for better interface
         {

@@ -188,24 +188,34 @@ namespace Haboob
     context->CSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
   }
 
-  void RaymarchVolumeShader::optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer)
+  void RaymarchVolumeShader::optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer, XMVECTOR& cameraPosition)
   {
     auto context = device.getContext().Get();
     renderer.bind(context);
 
+    bool cameraWithin = false;
+
+    // Determine if the camera is within a regular bounding sphere
+    {
+      XMVECTOR cameraLocals = XMVector3Transform(cameraPosition, marchInfo.localVolumeTransform);
+      float cameraRadius = XMVectorGetX(XMVector3Length(cameraLocals));
+      cameraWithin = cameraRadius <= sqrt(3) * .5f + .03f;
+    }
+
     // -ve values signal "not visible" or "fragment component not updated"
-    float rayClearColour[4] = { -1.f, -1.f, .0f, .0f };
+    float rayClearColour[4] = { cameraWithin ? .001f : -1.f, -1.f, .0f, 1.f };
     rayTarget.clear(context, rayClearColour);
     rayTarget.setTarget(context, device.getDepthBuffer());
     context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
 
-    // TODO: if the camera is within the bounds, the clear colour should NOT be -ve
-
     boundingBox->setVisible(true);
 
-    // Render front face
-    frontRayVisibilityPixelShader->bindShader(context);
-    renderer.draw(context, boundingBox);
+    if (!cameraWithin)
+    {
+      // Render front face
+      frontRayVisibilityPixelShader->bindShader(context);
+      renderer.draw(context, boundingBox);
+    }
     
     // Render back face
     {
