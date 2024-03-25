@@ -158,7 +158,6 @@ namespace Haboob
     // Optimisations
     MeshInstance* boundingBox;
     ComPtr<ID3D11BlendState> additiveBlend;
-    ComPtr<ID3D11BlendState> additiveOverlayBlend;
     ComPtr<ID3D11SamplerState> pixelSamplerState;
     Shader* frontRayVisibilityPixelShader;
     Shader* backRayVisibilityPixelShader;
@@ -166,7 +165,7 @@ namespace Haboob
 
     // Intermediates
     RenderTarget rayTarget; // Used to store ray information between stages
-    Shader* mirrorPixelShader;
+    Shader* mirrorComputeShader;
 
     // Main
     Shader* computeShader;

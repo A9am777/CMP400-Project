@@ -25,6 +25,8 @@ namespace Haboob
     inline void setViewMatrix(const XMMATRIX& matrix) { matrices.viewMatrix = matrix; }
     inline void setWorldMatrix(const XMMATRIX& matrix) { matrices.worldMatrix = matrix; }
 
+    ComPtr<ID3D11SamplerState> getSampler() { return sampler; }
+
     private:
     Shader* vertexShader;
     Shader* pixelShader;

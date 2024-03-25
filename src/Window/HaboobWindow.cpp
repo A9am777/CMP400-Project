@@ -47,7 +47,7 @@ namespace Haboob
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, requiredWidth, requiredHeight);
-      raymarchShader.createIntermediate(dev, requiredWidth, requiredHeight); // TODO: upscale :(
+      raymarchShader.createIntermediate(dev, requiredWidth, requiredHeight);
       light.create(dev, 1024, 1024);
 
       // Initialise all shaders
@@ -68,7 +68,7 @@ namespace Haboob
       
       // Generate assets
       {
-        sphereMesh.build(dev);
+        sphereMesh.build(dev, 128, 128);
         cubeMesh.build(dev);
         planeMesh.build(dev);
         scene.addMesh("Sphere", &sphereMesh);
@@ -404,10 +404,6 @@ namespace Haboob
     RenderTarget::copyShader.setProjectionMatrix(device.getOrthoMatrix());
 
     // Copy from the raymarch texture output to the lit buffer
-    {
-      ID3D11RenderTargetView* litTarget = gbuffer.getLitColourTarget().getRenderTarget();
-      context->OMSetRenderTargets(1, &litTarget, nullptr);
-    }
     raymarchShader.mirror(context);
 
     // Copy from lit buffer to backbuffer

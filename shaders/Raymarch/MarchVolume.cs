@@ -205,16 +205,13 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   float4 rayParams = screenOut[screenPosition];
   #endif
   
-  screenOut[threadID.xy] = float4(rayParams.x, rayParams.y, rayParams.z, 1.);
-  return;
-  
   // Mask fragments
-  if(rayParams.x < 0 || rayParams.y < 0 || rayParams.x > rayParams.y) 
+  if(rayParams.x < 0 || rayParams.y < 0) 
   { 
     #if SHOW_MASK
-    screenOut[threadID.xy] = float4(100., 100., 100., 100.);
+    screenOut[threadID.xy] = float4(100., 100., 100., 1.);
     #else
-    screenOut[threadID.xy] = float4(.0, .0, .0, .0);
+    screenOut[threadID.xy] = float4(.0, .0, .0, 1.);
     #endif
     return; 
   }
@@ -257,7 +254,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   params.mask = 0;
   #if !MARCH_MANUAL
     params.initialStep = .0;
-    params.marchZStep = 3. / float(params.iterations);
+    params.marchZStep = rayMaxDepth / float(params.iterations);
   #endif
   
   // Jump ray forward
@@ -296,7 +293,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     
     // TODO: this is the non-constant second path and needs to be replaced!
     // Lets assume it is the current density along the ray for now
-    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor;
+    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * 4.;
     
     // Accumulate intensity as a function of optical thickness
     float4 irradianceSample;
@@ -338,7 +335,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     return;
   #endif 
 
-  // TODO: background irradiance is no longer computed here
-  // Add irradiance from the volume itself
-  screenOut[threadID.xy] = float4(integrate(irradianceInteX, ray.travelDistance) + integrate(irradianceInteX2, ray.travelDistance), integrate(irradianceInteY, ray.travelDistance), integrate(irradianceInteZ, ray.travelDistance), 1.);
+  // Background transmission
+  float finalTransmission = max(blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance)), .1);
+  
+  // Set as irradiance from the volume with alpha = background transmission
+  screenOut[threadID.xy] = float4(integrate(irradianceInteX, ray.travelDistance) + integrate(irradianceInteX2, ray.travelDistance), integrate(irradianceInteY, ray.travelDistance), integrate(irradianceInteZ, ray.travelDistance), finalTransmission);
 }

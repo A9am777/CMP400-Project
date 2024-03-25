@@ -31,7 +31,7 @@ float insideBox3D(float3 v, float3 bottomLeft, float3 topRight)
   return s.x * s.y * s.z;
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(8, 8, 1)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
   float3 diffuseColour = diffuseTex[threadID.xy].rgb;

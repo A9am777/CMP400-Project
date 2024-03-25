@@ -10,7 +10,7 @@ namespace Haboob
   RaymarchVolumeShader::RaymarchVolumeShader()
   {
     computeShader = new Shader(Shader::Type::Compute, L"Raymarch/MarchVolume");
-    mirrorPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/MirrorMarchTexture");
+    mirrorComputeShader = new Shader(Shader::Type::Compute, L"Raymarch/MirrorMarchTexture");
     frontRayVisibilityPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/FrontFacingRayVisibility");
     backRayVisibilityPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/BackFacingRayVisibility");
 
@@ -23,7 +23,7 @@ namespace Haboob
   RaymarchVolumeShader::~RaymarchVolumeShader()
   {
     delete computeShader; computeShader = nullptr;
-    delete mirrorPixelShader; mirrorPixelShader = nullptr;
+    delete mirrorComputeShader; mirrorComputeShader = nullptr;
     delete frontRayVisibilityPixelShader; frontRayVisibilityPixelShader = nullptr;
     delete backRayVisibilityPixelShader; backRayVisibilityPixelShader = nullptr;
   }
@@ -34,7 +34,7 @@ namespace Haboob
 
     result = computeShader->initShader(device, manager);
     Firebreak(result);
-    result = mirrorPixelShader->initShader(device, manager);
+    result = mirrorComputeShader->initShader(device, manager);
     Firebreak(result);
     result = frontRayVisibilityPixelShader->initShader(device, manager);
     Firebreak(result);
@@ -110,24 +110,6 @@ namespace Haboob
       result = device->CreateBlendState(&blendDesc, additiveBlend.ReleaseAndGetAddressOf());
       Firebreak(result);
     }
-    // Create the additive blend state (for overlaying)
-    {
-      D3D11_BLEND_DESC blendDesc;
-      for (auto i = 0; i < 8; ++i)
-      {
-        blendDesc.RenderTarget[i] = D3D11_RENDER_TARGET_BLEND_DESC();
-        blendDesc.RenderTarget[i].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-        blendDesc.RenderTarget[i].BlendEnable = true;
-        blendDesc.RenderTarget[i].BlendOp = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[i].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[i].SrcBlend = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].DestBlend = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].SrcBlendAlpha = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].DestBlendAlpha = D3D11_BLEND_ZERO;
-      }
-      result = device->CreateBlendState(&blendDesc, additiveOverlayBlend.ReleaseAndGetAddressOf());
-      Firebreak(result);
-    }
 
     return result;
   }
@@ -178,23 +160,29 @@ namespace Haboob
   void RaymarchVolumeShader::mirror(ID3D11DeviceContext* context)
   {
     auto& copyShader = RenderTarget::copyShader;
+    
+    mirrorComputeShader->bindShader(context);
 
-    copyShader.setViewport(renderTarget->getViewport());
-    copyShader.bindShader(context);
-    // Overwrite the PS
-    mirrorPixelShader->bindShader(context);
+    ID3D11UnorderedAccessView* textureComputeView = renderTarget->getComputeView();
+    context->CSSetUnorderedAccessViews(0, 1, &textureComputeView, 0);
 
-    ID3D11ShaderResourceView* textureView = rayTarget.getShaderView();
-    context->PSSetShaderResources(0, 1, &textureView);
+    ID3D11SamplerState* sampler = copyShader.getSampler().Get();
+    context->CSSetSamplers(0, 1, &sampler);
 
-    context->OMSetBlendState(additiveOverlayBlend.Get(), nullptr, ~0);
-    copyShader.render(context);
-    context->OMSetBlendState(nullptr, nullptr, ~0);
+    ID3D11ShaderResourceView* rayResourceTexture = rayTarget.getShaderView();
+    context->CSSetShaderResources(0, 1, &rayResourceTexture);
 
-    textureView = nullptr;
-    context->PSSetShaderResources(0, 1, &textureView);
+    context->CSSetConstantBuffers(1, 1, marchBuffer.GetAddressOf());
 
-    mirrorPixelShader->unbindShader(context);
+    mirrorComputeShader->dispatch(context, 1 + renderTarget->getWidth() / 8, 1 + renderTarget->getHeight() / 8);
+
+    mirrorComputeShader->unbindShader(context);
+
+    void* nullpo = nullptr;
+    context->CSSetUnorderedAccessViews(0, 1, (ID3D11UnorderedAccessView**)&nullpo, 0);
+    context->CSSetConstantBuffers(1, 1, (ID3D11Buffer**)&nullpo);
+    context->CSSetSamplers(0, 1, (ID3D11SamplerState**)&nullpo);
+    context->CSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
   }
 
   void RaymarchVolumeShader::optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer)
@@ -239,6 +227,7 @@ namespace Haboob
       context->PSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
 
       device.setRasterState(previousRasterState);
+      device.setDepthEnabled(true);
     }
 
     renderer.unbind(context);

@@ -75,7 +75,7 @@ namespace Haboob
     context->CSSetShaderResources(0, 4, textureResources);
     context->CSSetUnorderedAccessViews(0, 1, &outTarget, nullptr);
     lightShader.bindShader(context, lightbuffer, lightCameraBuffer);
-      Shader::dispatch(context, litColourTarget.getWidth(), litColourTarget.getHeight());
+      Shader::dispatch(context, 1 + litColourTarget.getWidth() / 8, 1 + litColourTarget.getHeight() / 8);
     lightShader.unbindShader(context);
 
     std::memset(textureResources, 0, sizeof(textureResources));
@@ -92,7 +92,7 @@ namespace Haboob
     toneMapShader.setExposure(exposure);
 
     toneMapShader.bindShader(context, litColourTarget.getComputeView());
-      Shader::dispatch(context, litColourTarget.getWidth(), litColourTarget.getHeight());
+      Shader::dispatch(context, 1 + litColourTarget.getWidth() / 8, 1 + litColourTarget.getHeight() / 8);
     toneMapShader.unbindShader(context);
   }
 
