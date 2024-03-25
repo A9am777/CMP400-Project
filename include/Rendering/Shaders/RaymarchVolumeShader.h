@@ -17,6 +17,10 @@ namespace Haboob
     float texelDensity; // The density of the volume texture in world space
     float pixelRadius = .001f; // The radius a pixel occupies in world space
     float pixelRadiusDelta = .245f; // The linear change of pixel radius with world depth
+
+    XMMATRIX localVolumeTransform; // Transforms from world space to volume space
+    XMFLOAT3 volumeSize; // The scale of the volume in world space
+    float volumeSizeW = 1.f;
   };
 
   struct BasicOptics

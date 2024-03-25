@@ -124,6 +124,9 @@ namespace Haboob
     {
       marchInfo.outputHorizontalStep = 1.f / float(rayTarget.getWidth());
       marchInfo.outputVerticalStep = 1.f / float(rayTarget.getHeight());
+      boundingBox->buildTransform();
+      marchInfo.localVolumeTransform = XMMatrixInverse(nullptr, boundingBox->getTransform());
+      marchInfo.volumeSize = boundingBox->getScale();
 
       D3D11_MAPPED_SUBRESOURCE mapped;
       HRESULT result = context->Map(marchBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);

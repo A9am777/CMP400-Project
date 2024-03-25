@@ -110,16 +110,17 @@ float cubeDensitySample(in Ray ray, in Cube cube)
   return volumeTexture.SampleLevel(volumeSampler, localPos, .5).r;
 }
 
-float3 haboobCubeDensitySample(in Ray ray, in Cube cube)
+float3 haboobCubeDensitySample(in Ray ray)
 {
-  // Compute the local coordinates within the cube (TODO: use matrix)
-  float3 localPos = ray.pos.xyz - cube.pos.xyz;
-  localPos.xyz = localPos.xyz / cube.size;
+  // Compute the local coordinates within the cube
+  float4 localPos = mul(float4(ray.pos.xyz, 1.), dispatchInfo.localVolumeTransform);
+  localPos = localPos / localPos.w;
+  localPos.xyz += float3(.5, .5, .5);
   
   #if APPLY_CONE_TRACE
-    return volumeTexture.SampleLevel(volumeSampler, localPos, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x)).rgb;
+    return volumeTexture.SampleLevel(volumeSampler, localPos.xyz, getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x)).rgb;
   #else
-    return volumeTexture.SampleLevel(volumeSampler, localPos, .0).rgb;
+    return volumeTexture.SampleLevel(volumeSampler, localPos.xyz, .0).rgb;
   #endif
 }
 
@@ -241,11 +242,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   ray.colour = float4(1., 1., 1., 0.);
   ray.travelDistance = .0;
   
-  // Sampling cube
-  Cube cube;
-  cube.size = float3(3., 3., 3.);
-  cube.pos = float4(-cube.size * float3(.5,.5,.5), 1.); // Shift from centre origin to AABB
-  
   // Set march params
   MarchParams params;
   params.iterations = dispatchInfo.iterations * 2; // *Must* be a multiple of 2
@@ -280,7 +276,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   for (uint i = 0; i < params.iterations; ++i)
   {
     // Accumulate absorption from density
-    float3 haboobSample = haboobCubeDensitySample(ray, cube);
+    float3 haboobSample = haboobCubeDensitySample(ray);
     float densitySample = haboobSample.x;
     float densityMaxSample = haboobSample.y;
     float angstromSample = haboobSample.z;
@@ -325,9 +321,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte, ray.travelDistance), .0, .0, 1.);
     return;
   #elif SHOW_SAMPLE_LEVEL
-    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x), .0, 1.);
+    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x), .0, 1.);
     ray.travelDistance = params.initialStep;
-    sampleLevelInfo.x = getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x);
+    sampleLevelInfo.x = getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x);
     screenOut[threadID.xy] = sampleLevelInfo / 8.;
     return;
   #elif SHOW_RAY_TRAVEL
