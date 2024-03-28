@@ -63,6 +63,7 @@ namespace Haboob
     HRESULT capture(const std::wstring& path, ID3D11DeviceContext* context); // VERY SLOW
 
     inline RenderTarget& getLitColourTarget() { return litColourTarget; }
+    inline RenderTarget& getNormalDepthTarget() { return normalDepthTarget; }
 
     inline float& getGamma() { return gamma; }
     inline float& getExposure() { return exposure; }

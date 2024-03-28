@@ -6,11 +6,14 @@
   #define APPLY_HG 1
   #define APPLY_SPECTRAL 1
   #define APPLY_CONE_TRACE 1
+  #define APPLY_UPSCALE 1
   #define MARCH_MANUAL 0
   #define MARCH_STEP_COUNT 24
   #define SHOW_DENSITY 0
   #define SHOW_ANGSTROM 0
   #define SHOW_SAMPLE_LEVEL 0
+  #define SHOW_MASK 0
+  #define SHOW_RAY_TRAVEL 0
 #endif
 
 RWTexture2D<float4> screenOut : register(u0);
@@ -86,6 +89,9 @@ bool inSphere(in Ray ray, in Sphere sphere)
 float getConeSampleLevel(in Ray ray, float worldToTexels)
 {
   float rayRadius = dispatchInfo.pixelRadius + dispatchInfo.pixelRadiusDelta * ray.travelDistance;
+  #if APPLY_UPSCALE
+  rayRadius *= 2.;
+  #endif
   return log2(rayRadius * worldToTexels);
 }
 
@@ -104,16 +110,17 @@ float cubeDensitySample(in Ray ray, in Cube cube)
   return volumeTexture.SampleLevel(volumeSampler, localPos, .5).r;
 }
 
-float3 haboobCubeDensitySample(in Ray ray, in Cube cube)
+float3 haboobCubeDensitySample(in Ray ray)
 {
-  // Compute the local coordinates within the cube (TODO: use matrix)
-  float3 localPos = ray.pos.xyz - cube.pos.xyz;
-  localPos.xyz = localPos.xyz / cube.size;
+  // Compute the local coordinates within the cube
+  float4 localPos = mul(float4(ray.pos.xyz, 1.), dispatchInfo.localVolumeTransform);
+  localPos = localPos / localPos.w;
+  localPos.xyz += float3(.5, .5, .5);
   
   #if APPLY_CONE_TRACE
-    return volumeTexture.SampleLevel(volumeSampler, localPos, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x)).rgb;
+    return volumeTexture.SampleLevel(volumeSampler, localPos.xyz, getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x)).rgb;
   #else
-    return volumeTexture.SampleLevel(volumeSampler, localPos, .0).rgb;
+    return volumeTexture.SampleLevel(volumeSampler, localPos.xyz, .0).rgb;
   #endif
 }
 
@@ -181,15 +188,45 @@ float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
 [numthreads(16, 16, 1)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
-  // Actually a matrix is probably better here, maybe even rasterisation pass?
-  float2 normScreen = float2(normToSigned((float(threadID.x) + .5f) * dispatchInfo.outputHorizontalStep),
-                              -normToSigned((float(threadID.y) + .5f) * dispatchInfo.outputVerticalStep));
+  #if APPLY_UPSCALE
+  // Using 1/4 rays over 1/4 of the screen
+  int2 screenPosition = threadID.xy * 2;
+  
+  // Fetch parameters that have been fed in (over the 2x2 pixel area)
+  float4 rayParams = screenOut[screenPosition];
+  rayParams += screenOut[screenPosition + int2(1, 0)];
+  rayParams += screenOut[screenPosition + int2(0, 1)];
+  rayParams += screenOut[screenPosition + int2(1, 1)];
+  rayParams *= .25;
+  #else
+  // Using all rays over the screen
+  int2 screenPosition = threadID.xy;
+  
+  // Fetch parameters that have been fed in
+  float4 rayParams = screenOut[screenPosition];
+  #endif
+  
+  // Mask fragments
+  if(rayParams.x < 0 || rayParams.y < 0) 
+  { 
+    #if SHOW_MASK
+    screenOut[threadID.xy] = float4(100., 100., 100., 1.);
+    #else
+    screenOut[threadID.xy] = float4(.0, .0, .0, 1.);
+    #endif
+    return; 
+  }
+  
+  // Utilise the rasterization pass to fetch screen coordinates
+  float2 normScreen = float2(rayParams.z, normToSigned(rayParams.w - 1.));
   
   // Form a ray from the screen
   Ray ray;
-  ray.pos = float4(normScreen, 0, 1.);
+  float rayMaxDepth = .0;
+  
+  ray.pos = float4(normScreen, rayParams.x, 1.);
   {
-    float4 directionPointTarget = float4(normScreen, ZDirectionTest, 1.);
+    float4 directionPointTarget = float4(normScreen, rayParams.y, 1.);
     
     // Convert both points to world space
     ray.pos = mul(ray.pos, camera.inverseViewProjectionMatrix);
@@ -198,21 +235,12 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     fromHomogeneous(directionPointTarget);
     
     // Create a normalised direction vector
-    ray.dir = normalize(directionPointTarget - ray.pos);
+    ray.dir = directionPointTarget - ray.pos;
+    rayMaxDepth = length(ray.dir);
+    ray.dir /= rayMaxDepth;
   }
   ray.colour = float4(1., 1., 1., 0.);
   ray.travelDistance = .0;
-  
-  // Bounding sphere
-  Sphere sphere;
-  sphere.pos = float4(0., 0., 0., 1.);
-  
-  // Sampling cube
-  Cube cube;
-  cube.size = float3(3., 3., 3.);
-  cube.pos = float4(sphere.pos.xyz - cube.size * float3(.5,.5,.5), 1.); // Shift from centre origin to AABB
-  
-  sphere.sqrRadius = dot(cube.size * float3(.5, .5, .5), cube.size * float3(.5, .5, .5)); // Encapsulate cube
   
   // Set march params
   MarchParams params;
@@ -221,15 +249,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   params.initialStep = dispatchInfo.initialZStep;
   params.mask = 0;
   #if !MARCH_MANUAL
-    // Use the bounding sphere to approximate better params
-    determineSphereParams(params, ray, sphere);
+    params.initialStep = .0;
+    params.marchZStep = rayMaxDepth / float(params.iterations);
   #endif
-  
-  // Exit now if possible
-  if(params.mask)
-  {
-    return;
-  }
   
   // Jump ray forward
   march(ray, params.initialStep);
@@ -254,7 +276,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   for (uint i = 0; i < params.iterations; ++i)
   {
     // Accumulate absorption from density
-    float3 haboobSample = haboobCubeDensitySample(ray, cube);
+    float3 haboobSample = haboobCubeDensitySample(ray);
     float densitySample = haboobSample.x;
     float densityMaxSample = haboobSample.y;
     float angstromSample = haboobSample.z;
@@ -262,12 +284,12 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     append(absorptionInte, densitySample);
     append(angstromInte, angstromSample);
     
-    float referenceOpticalDepth = opticalInfo.attenuationFactor * integrate(absorptionInte);
-    float referenceAngstromAbsorption = opticalInfo.absorptionAngstromExponent * integrate(angstromInte);
+    float referenceOpticalDepth = opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance);
+    float referenceAngstromAbsorption = opticalInfo.absorptionAngstromExponent * integrate(angstromInte, ray.travelDistance);
     
     // TODO: this is the non-constant second path and needs to be replaced!
     // Lets assume it is the current density along the ray for now
-    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor;
+    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * 2.;
     
     // Accumulate intensity as a function of optical thickness
     float4 irradianceSample;
@@ -293,22 +315,25 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Debug/testing outputs
   #if SHOW_DENSITY
-    screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte), .0, .0, .0);
+    screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance), .0, .0, 1.);
     return;
   #elif SHOW_ANGSTROM
-    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte), .0, .0, .0);
+    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte, ray.travelDistance), .0, .0, 1.);
     return;
   #elif SHOW_SAMPLE_LEVEL
-    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x), .0, .0);
+    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x), .0, 1.);
     ray.travelDistance = params.initialStep;
-    sampleLevelInfo.x = getConeSampleLevel(ray, dispatchInfo.texelDensity / cube.size.x);
+    sampleLevelInfo.x = getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x);
     screenOut[threadID.xy] = sampleLevelInfo / 8.;
+    return;
+  #elif SHOW_RAY_TRAVEL
+    screenOut[threadID.xy] = float4(ray.travelDistance, 1., 1., 1.);
     return;
   #endif 
 
+  // Background transmission, assume uniform behaviour across wavelengths (use Beer-Lambert over powder)
+  float finalTransmission = blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance));
   
-  // Apply scattering to incoming background irradiance
-  screenOut[threadID.xy] *= blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte)); //TODO: BP is not very good here
-  // Add irradiance from the volume itself
-  screenOut[threadID.xy] += float4(integrate(irradianceInteX) + integrate(irradianceInteX2), integrate(irradianceInteY), integrate(irradianceInteZ), .0);
+  // Set as irradiance from the volume with alpha = background transmission
+  screenOut[threadID.xy] = float4(integrate(irradianceInteX, ray.travelDistance) + integrate(irradianceInteX2, ray.travelDistance), integrate(irradianceInteY, ray.travelDistance), integrate(irradianceInteZ, ray.travelDistance), finalTransmission);
 }

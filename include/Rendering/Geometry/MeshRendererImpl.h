@@ -4,7 +4,7 @@
 namespace Haboob
 {
   template<typename VertexT>
-  inline MeshInstance<VertexT>::MeshInstance(Mesh<VertexT>* mesh) : baseMesh{ mesh }
+  inline MeshInstance<VertexT>::MeshInstance(Mesh<VertexT>* mesh) : baseMesh{ mesh }, visible{ true }
   {
     transform = XMMatrixIdentity();
     position = XMFLOAT3{ .0f, .0f, .0f };
@@ -59,13 +59,15 @@ namespace Haboob
   template<typename VertexT>
   inline void MeshRenderer<VertexT>::draw(ID3D11DeviceContext* context, MeshInstance<VertexT>* instance)
   {
+    if (!instance->visible) { return; }
+
     uploadTransformFunc(instance->transform);
     if (instance->baseMesh != cachedMesh)
     {
       cachedMesh = instance->baseMesh;
       cachedMesh->useBuffers(context);
     }
-
+    
     cachedMesh->draw(context);
   }
   template<typename VertexT>

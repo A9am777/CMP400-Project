@@ -14,6 +14,9 @@ struct MarchVolumeDispatchInfo
   float texelDensity; // The density of the volume texture in world space
   float pixelRadius; // The radius a pixel occupies in world space
   float pixelRadiusDelta; // The linear change of pixel radius with world depth
+  
+  float4x4 localVolumeTransform; // Transforms from world space to volume space
+  float4 volumeSize; // The scale of the volume in world space
 };
 
 struct BasicOptics
@@ -78,10 +81,6 @@ struct SimpsonsIntegrator // Simpsons rule
 
 static float PI = radians(180.);
 
-// The depth to find the ray 'end' at
-#define ZDirectionTest .01
-
-
 void append(inout SimpsonsIntegrator inte, float value)
 {
   inte.lastTerm = value;
@@ -97,10 +96,9 @@ void append(inout SimpsonsIntegrator inte, float value)
   inte.count++;
 }
 
-float integrate(inout SimpsonsIntegrator inte)
+float integrate(inout SimpsonsIntegrator inte, float range)
 {
-  // Note: sample count must always be even
-  float stepSize = 1. / float(inte.count);
+  float stepSize = range / float(inte.count);
   float result = inte.firstTerm + inte.lastTerm;
   result += 4. * inte.odds;
   result += 2 * (inte.evens - inte.lastTerm);

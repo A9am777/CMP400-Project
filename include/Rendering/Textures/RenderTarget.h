@@ -30,6 +30,7 @@ namespace Haboob
 
     static D3D11_TEXTURE2D_DESC defaultTextureDesc;
     static RenderCopyShader copyShader;
+    static float defaultBlackA[4];
     static float defaultBlack[4];
     static float defaultWhite[4];
     static float defaultRed[4];

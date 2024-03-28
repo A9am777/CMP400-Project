@@ -1,6 +1,9 @@
 #pragma once
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/RenderTarget.h"
+#include "Rendering/Geometry/MeshRenderer.h"
+#include <Rendering/Textures/GBuffer.h>
+#include <Rendering/Scene/Camera.h>
 
 namespace Haboob
 {
@@ -15,6 +18,10 @@ namespace Haboob
     float texelDensity; // The density of the volume texture in world space
     float pixelRadius = .001f; // The radius a pixel occupies in world space
     float pixelRadiusDelta = .245f; // The linear change of pixel radius with world depth
+
+    XMMATRIX localVolumeTransform; // Transforms from world space to volume space
+    XMFLOAT3 volumeSize; // The scale of the volume in world space
+    float volumeSizeW = 1.f;
   };
 
   struct BasicOptics
@@ -127,20 +134,49 @@ namespace Haboob
     void bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource);
     void unbindShader(ID3D11DeviceContext* context);
 
+    // Mirror from the intermediate to the target buffer
+    void mirror(ID3D11DeviceContext* context);
+
+    // TODO: TEMP
+    void optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer, XMVECTOR& cameraPosition);
+
+    HRESULT createIntermediate(ID3D11Device* device, UInt width, UInt height);
+    HRESULT resizeIntermediate(ID3D11Device* device, UInt width, UInt height);
+
     void render(ID3D11DeviceContext* context) const;
 
     inline void setTarget(RenderTarget* target) { renderTarget = target; }
     inline void setCameraBuffer(ComPtr<ID3D11Buffer> buffer) { cameraBuffer = buffer; }
     inline void setLightBuffer(ComPtr<ID3D11Buffer> buffer) { lightBuffer = buffer; }
+    inline void setBox(MeshInstance<VertexType>* boxInstance) { boundingBox = boxInstance; }
+    inline void setShouldUpscale(bool upscale) { shouldUpscale = upscale; }
 
+    inline MeshInstance<VertexType>* getBox() { return boundingBox; }
     inline MarchVolumeDispatchInfo& getMarchInfo() { return marchInfo; }
     inline BasicOptics& getOpticsInfo() { return opticsInfo; }
 
     void buildSpectralMatrices();
 
     private:
+    typedef MeshInstance<VertexType> MeshInstance;
+
+    // Optimisations
+    MeshInstance* boundingBox;
+    ComPtr<ID3D11BlendState> additiveBlend;
+    ComPtr<ID3D11SamplerState> pixelSamplerState;
+    Shader* frontRayVisibilityPixelShader;
+    Shader* backRayVisibilityPixelShader;
+    bool shouldUpscale;
+
+    // Intermediates
+    RenderTarget rayTarget; // Used to store ray information between stages
+    Shader* mirrorComputeShader;
+
+    // Main
     Shader* computeShader;
     RenderTarget* renderTarget;
+    
+    // Buffers
     MarchVolumeDispatchInfo marchInfo;
     BasicOptics opticsInfo;
     ComPtr<ID3D11SamplerState> marchSamplerState;

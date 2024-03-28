@@ -47,6 +47,7 @@ namespace Haboob
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, requiredWidth, requiredHeight);
+      raymarchShader.createIntermediate(dev, requiredWidth, requiredHeight);
       light.create(dev, 1024, 1024);
 
       // Initialise all shaders
@@ -67,7 +68,7 @@ namespace Haboob
       
       // Generate assets
       {
-        sphereMesh.build(dev);
+        sphereMesh.build(dev, 128, 128);
         cubeMesh.build(dev);
         planeMesh.build(dev);
         scene.addMesh("Sphere", &sphereMesh);
@@ -96,6 +97,13 @@ namespace Haboob
         instance = new Instance(&cubeMesh);
         instance->getPosition() = { -2.f, 1.5f, .0f };
         scene.addObject(instance);
+
+        // Haboob volume
+        instance = new Instance(&sphereMesh);
+        instance->getPosition() = { .0f, .0f, .0f };
+        instance->getScale() = { 3.f, 3.f, 3.f };
+        scene.addObject(instance);
+        raymarchShader.setBox(instance);
       }
     }
 
@@ -244,6 +252,7 @@ namespace Haboob
       shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
       shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
       shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
+      shaderManager.setMacro("APPLY_UPSCALE", std::to_string(upscaleTracing));
       shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
     }
 
@@ -251,6 +260,8 @@ namespace Haboob
       shaderManager.setMacro("SHOW_DENSITY", std::to_string(showDensity));
       shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
       shaderManager.setMacro("SHOW_SAMPLE_LEVEL", std::to_string(showSampleLevel));
+      shaderManager.setMacro("SHOW_MASK", std::to_string(showMasks));
+      shaderManager.setMacro("SHOW_RAY_TRAVEL", std::to_string(showRayTravel));
     }
 
     shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
@@ -268,6 +279,9 @@ namespace Haboob
       haboobVolume.render(device.getContext().Get());
       raymarchShader.getMarchInfo().texelDensity = float(haboobVolume.getVolumeInfo().size.x);
     }
+
+    raymarchShader.getBox()->setVisible(showBoundingBoxes);
+    raymarchShader.setShouldUpscale(upscaleTracing);
   }
 
   void HaboobWindow::createD3D()
@@ -284,6 +298,7 @@ namespace Haboob
   void HaboobWindow::adjustProjection()
   {
     gbuffer.resize(device.getDevice().Get(), requiredWidth, requiredHeight);
+    raymarchShader.resizeIntermediate(device.getDevice().Get(), requiredWidth, requiredHeight);
 
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
@@ -361,6 +376,10 @@ namespace Haboob
     // Basic lit pass
     gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), light.getShadowSampler().Get());
 
+    // Initial raymarch optimisation passes
+    raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&mainCamera.getPosition()));
+
+    // Set up requirements for the proper pass
     scene.setCamera(&mainCamera);
     raymarchShader.setCameraBuffer(scene.getCameraBuffer());
     raymarchShader.setLightBuffer(light.getLightBuffer());
@@ -377,13 +396,19 @@ namespace Haboob
     TracyD3D11Zone(tcyCtx, "D3DFrameMirror");
     ZoneNamed(RenderMirror, true);
 
-    device.clearBackBuffer();
-    device.setBackBufferTarget();
+    auto context = device.getContext().Get();
+
+    // Set up states for copying
     device.setRasterState(DisplayDevice::RasterFlags::RASTER_STATE_DEFAULT);
     device.setDepthEnabled(false);
     RenderTarget::copyShader.setProjectionMatrix(device.getOrthoMatrix());
 
-    auto context = device.getContext().Get();
+    // Copy from the raymarch texture output to the lit buffer
+    raymarchShader.mirror(context);
+
+    // Copy from lit buffer to backbuffer
+    device.clearBackBuffer();
+    device.setBackBufferTarget();
     gbuffer.finalLitPass(context);
     gbuffer.renderFromLit(context);
   }
@@ -529,7 +554,11 @@ namespace Haboob
     renderHaboob = false;
     renderScene = true;
     coneTrace = true;
+    upscaleTracing = true;
     manualMarch = false;
+    showBoundingBoxes = false;
+    showMasks = false;
+    showRayTravel = false;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -697,6 +726,18 @@ namespace Haboob
         ->setName("Render Scene"));
       renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool, nullptr, &renderHaboob))
         ->setName("Render Haboob"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowBoundingBoxes", "If the renderer should display all bounding boxes", { "sbb" }),
+        &showBoundingBoxes))
+        ->setName("Show Bounding Boxes"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowMasks", "If the renderer should display raymarch masks", { "smk" }),
+        &showMasks))
+        ->setName("Show Masks"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowRayTravel", "If the renderer should display the distance rays have travelled", { "srt" }),
+        &showRayTravel))
+        ->setName("Show Ray Travel"));
     }
 
     {
@@ -880,6 +921,10 @@ namespace Haboob
         new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyConeTrace", "If cone tracing should be used for anti-aliasing", { "uct" }), 
         &coneTrace))
         ->setName("Apply Cone Tracing"));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyUpscaleTrace", "If upscaling should be used for raymarching", { "uqt" }),
+        &upscaleTracing))
+        ->setName("Apply Upscale Tracing"));
     }
   }
   void HaboobWindow::show()

@@ -25,6 +25,7 @@ namespace Haboob
     void draw(ID3D11DeviceContext* context, bool usePixel = true);
 
     ComPtr<ID3D11Buffer>& getCameraBuffer() { return cameraBuffer; }
+    MeshRenderer<VertexType>& getMeshRenderer() { return meshRenderer; }
 
     void imguiSceneTree();
 
