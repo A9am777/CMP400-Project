@@ -272,7 +272,8 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   Integrator irradianceInteZ = { 0, 0, 0, 0, 0 };
   Integrator irradianceInteX2 = { 0, 0, 0, 0, 0 };
   
-  [loop] // Yeah need to consider this impact
+  // Must not unroll due to iterative sampling
+  [loop]
   for (uint i = 0; i < params.iterations; ++i)
   {
     // Accumulate absorption from density
@@ -289,7 +290,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     
     // TODO: this is the non-constant second path and needs to be replaced!
     // Lets assume it is the current density along the ray for now
-    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * 2.;
+    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * 2.1;
     
     // Accumulate intensity as a function of optical thickness
     float4 irradianceSample;

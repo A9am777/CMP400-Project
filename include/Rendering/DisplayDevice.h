@@ -32,7 +32,7 @@ namespace Haboob
     void setBackBufferTarget();
 
     // States
-    void setDepthEnabled(bool useDepth);
+    void setDepthEnabled(bool useDepth, bool writeDepth = true);
     void setWireframe(bool isWireframe);
     void setCull(bool isCull);
     void setCullBackface(bool isCullBack);
@@ -75,6 +75,7 @@ namespace Haboob
 
     // States
     ComPtr<ID3D11DepthStencilState> depthEnabledState;
+    ComPtr<ID3D11DepthStencilState> depthEnabledReadOnlyState;
     ComPtr<ID3D11DepthStencilState> depthDisabledState;
 
     ComPtr<ID3D11RasterizerState> rasterStates[RASTER_STATE_COUNT];

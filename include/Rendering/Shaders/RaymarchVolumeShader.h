@@ -4,6 +4,7 @@
 #include "Rendering/Geometry/MeshRenderer.h"
 #include <Rendering/Textures/GBuffer.h>
 #include <Rendering/Scene/Camera.h>
+#include <Rendering/Lighting/LightSource.h>
 
 namespace Haboob
 {
@@ -130,9 +131,12 @@ namespace Haboob
     RaymarchVolumeShader();
     ~RaymarchVolumeShader();
 
+
     HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource);
     void unbindShader(ID3D11DeviceContext* context);
+
+    void updateSharedBuffers(ID3D11DeviceContext* context);
 
     // Mirror from the intermediate to the target buffer
     void mirror(ID3D11DeviceContext* context);
@@ -140,14 +144,19 @@ namespace Haboob
     // TODO: TEMP
     void optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer, XMVECTOR& cameraPosition);
 
-    HRESULT createIntermediate(ID3D11Device* device, UInt width, UInt height);
-    HRESULT resizeIntermediate(ID3D11Device* device, UInt width, UInt height);
+    // Renders the Beer Shadow Map
+    void bindSoftShadowMap(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource);
+    void generateSoftShadowMap(ID3D11DeviceContext* context) const;
+    void unbindSoftShadowMap(ID3D11DeviceContext* context);
+
+    HRESULT createTextures(ID3D11Device* device, UInt width, UInt height);
+    HRESULT resizeTextures(ID3D11Device* device, UInt width, UInt height);
 
     void render(ID3D11DeviceContext* context) const;
 
     inline void setTarget(RenderTarget* target) { renderTarget = target; }
     inline void setCameraBuffer(ComPtr<ID3D11Buffer> buffer) { cameraBuffer = buffer; }
-    inline void setLightBuffer(ComPtr<ID3D11Buffer> buffer) { lightBuffer = buffer; }
+    inline void setLightSource(Light* lightSource) { mainLight = lightSource; }
     inline void setBox(MeshInstance<VertexType>* boxInstance) { boundingBox = boxInstance; }
     inline void setShouldUpscale(bool upscale) { shouldUpscale = upscale; }
 
@@ -170,7 +179,9 @@ namespace Haboob
 
     // Intermediates
     RenderTarget rayTarget; // Used to store ray information between stages
+    RenderTarget bsmTarget; // Used to store ray information between stages
     Shader* mirrorComputeShader;
+    Shader* bsmComputeShader;
 
     // Main
     Shader* computeShader;
@@ -182,7 +193,7 @@ namespace Haboob
     ComPtr<ID3D11SamplerState> marchSamplerState;
     ComPtr<ID3D11Buffer> marchBuffer;
     ComPtr<ID3D11Buffer> cameraBuffer;
-    ComPtr<ID3D11Buffer> lightBuffer;
+    Light* mainLight;
 
     // Coefficients of CIE functions in order {scale, exponentScale, wavelengthScale, wavelengthOffset}
     float redMinorCIECoefficients[4] = { 0.39800f, 35.35534f, 0.78895f, 0.56223f };

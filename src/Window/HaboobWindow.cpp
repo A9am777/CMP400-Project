@@ -47,7 +47,7 @@ namespace Haboob
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, requiredWidth, requiredHeight);
-      raymarchShader.createIntermediate(dev, requiredWidth, requiredHeight);
+      raymarchShader.createTextures(dev, requiredWidth, requiredHeight);
       light.create(dev, 1024, 1024);
 
       // Initialise all shaders
@@ -282,6 +282,10 @@ namespace Haboob
 
     raymarchShader.getBox()->setVisible(showBoundingBoxes);
     raymarchShader.setShouldUpscale(upscaleTracing);
+
+    raymarchShader.setCameraBuffer(scene.getCameraBuffer());
+    raymarchShader.setLightSource(&light);
+    raymarchShader.setTarget(&gbuffer.getLitColourTarget());
   }
 
   void HaboobWindow::createD3D()
@@ -298,7 +302,7 @@ namespace Haboob
   void HaboobWindow::adjustProjection()
   {
     gbuffer.resize(device.getDevice().Get(), requiredWidth, requiredHeight);
-    raymarchShader.resizeIntermediate(device.getDevice().Get(), requiredWidth, requiredHeight);
+    raymarchShader.resizeTextures(device.getDevice().Get(), requiredWidth, requiredHeight);
 
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
@@ -335,6 +339,7 @@ namespace Haboob
     device.setDepthEnabled(true);
     light.updateCameraView();
     light.rebuildLightBuffers(device.getContext().Get());
+    raymarchShader.updateSharedBuffers(device.getContext().Get());
     device.clearBackBuffer();
     gbuffer.clear(device.getContext().Get());
     gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
@@ -373,22 +378,34 @@ namespace Haboob
 
     auto context = device.getContext().Get();
 
+    // Generate the BSM
+    {
+      // Initial raymarch optimisation passes
+      scene.setCamera(&light.getCamera());
+      raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&light.getRenderPosition()));
+
+      // Raymarch!
+      raymarchShader.bindSoftShadowMap(context, haboobVolume.getShaderView());
+      raymarchShader.render(context);
+      raymarchShader.unbindSoftShadowMap(context);
+    }
+
+    scene.setCamera(&mainCamera);
+
     // Basic lit pass
     gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), light.getShadowSampler().Get());
 
-    // Initial raymarch optimisation passes
-    raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&mainCamera.getPosition()));
+    // Render the volume
+    {
+      // Initial raymarch optimisation passes
+      scene.setCamera(&mainCamera);
+      raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&mainCamera.getPosition()));
 
-    // Set up requirements for the proper pass
-    scene.setCamera(&mainCamera);
-    raymarchShader.setCameraBuffer(scene.getCameraBuffer());
-    raymarchShader.setLightBuffer(light.getLightBuffer());
-    raymarchShader.setTarget(&gbuffer.getLitColourTarget());
-
-    // Raymarch!
-    raymarchShader.bindShader(context, haboobVolume.getShaderView());
-    raymarchShader.render(context);
-    raymarchShader.unbindShader(context);
+      // Raymarch!
+      raymarchShader.bindShader(context, haboobVolume.getShaderView());
+      raymarchShader.render(context);
+      raymarchShader.unbindShader(context);
+    }
   }
 
   void HaboobWindow::renderMirror()

@@ -160,9 +160,16 @@ namespace Haboob
     deviceContext->OMSetRenderTargets(1, backBufferTarget.GetAddressOf(), depthBufferView.Get());
   }
 
-  void DisplayDevice::setDepthEnabled(bool useDepth)
+  void DisplayDevice::setDepthEnabled(bool useDepth, bool writeDepth)
   {
-    deviceContext->OMSetDepthStencilState(useDepth ? depthEnabledState.Get() : depthDisabledState.Get(), 1);
+    if (writeDepth)
+    {
+      deviceContext->OMSetDepthStencilState(useDepth ? depthEnabledState.Get() : depthDisabledState.Get(), 1);
+    }
+    else
+    {
+      deviceContext->OMSetDepthStencilState(useDepth ? depthEnabledReadOnlyState.Get() : depthDisabledState.Get(), 1);
+    }
   }
 
   void DisplayDevice::setWireframe(bool isWireframe)
@@ -260,6 +267,11 @@ namespace Haboob
 
       // Enabled state
       result = device->CreateDepthStencilState(&depthStateDesc, depthEnabledState.ReleaseAndGetAddressOf());
+      Firebreak(result);
+
+      // Enabled, do not write state
+      depthStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+      result = device->CreateDepthStencilState(&depthStateDesc, depthEnabledReadOnlyState.ReleaseAndGetAddressOf());
       Firebreak(result);
 
       // Disabled state
