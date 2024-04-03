@@ -96,22 +96,30 @@ namespace Haboob
       Firebreak(result);
     }
 
-    // Create the additive blend state (for ray cull optimisations)
+    // Create the masking blend state (for ray cull optimisations)
     {
       D3D11_BLEND_DESC blendDesc;
-      for (auto i = 0; i < 8; ++i)
+      blendDesc.AlphaToCoverageEnable = false;
+      blendDesc.IndependentBlendEnable = false;
+
+      auto& renderTargetBlend = blendDesc.RenderTarget[0];
       {
-        blendDesc.RenderTarget[i] = D3D11_RENDER_TARGET_BLEND_DESC();
-        blendDesc.RenderTarget[i].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-        blendDesc.RenderTarget[i].BlendEnable = true;
-        blendDesc.RenderTarget[i].BlendOp = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[i].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[i].SrcBlend = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].DestBlend = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].SrcBlendAlpha = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].DestBlendAlpha = D3D11_BLEND_ZERO;
+        renderTargetBlend = D3D11_RENDER_TARGET_BLEND_DESC();
+        renderTargetBlend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_ALPHA;
+        renderTargetBlend.BlendEnable = true;
+        renderTargetBlend.BlendOp = D3D11_BLEND_OP_ADD;
+        renderTargetBlend.BlendOpAlpha = D3D11_BLEND_OP_ADD;
+        renderTargetBlend.SrcBlend = D3D11_BLEND_ONE;
+        renderTargetBlend.DestBlend = D3D11_BLEND_ZERO;
+        renderTargetBlend.SrcBlendAlpha = D3D11_BLEND_ONE;
+        renderTargetBlend.DestBlendAlpha = D3D11_BLEND_ZERO;
       }
-      result = device->CreateBlendState(&blendDesc, additiveBlend.ReleaseAndGetAddressOf());
+      result = device->CreateBlendState(&blendDesc, frontRayBlend.ReleaseAndGetAddressOf());
+      Firebreak(result);
+
+      renderTargetBlend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL & ~D3D11_COLOR_WRITE_ENABLE_RED;
+
+      result = device->CreateBlendState(&blendDesc, backRayBlend.ReleaseAndGetAddressOf());
       Firebreak(result);
     }
 
@@ -149,8 +157,6 @@ namespace Haboob
 
     context->CSSetSamplers(0, 1, marchSamplerState.GetAddressOf());
     context->CSSetShaderResources(0, 1, &densityTexResource);
-
-    context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
   }
 
   void RaymarchVolumeShader::unbindShader(ID3D11DeviceContext* context)
@@ -164,8 +170,6 @@ namespace Haboob
     context->CSSetConstantBuffers(2, 1, (ID3D11Buffer**)&nullpo);
     context->CSSetSamplers(0, 1, (ID3D11SamplerState**)&nullpo);
     context->CSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
-
-    context->OMSetBlendState(nullptr, nullptr, ~0);
   }
 
   void RaymarchVolumeShader::mirror(ID3D11DeviceContext* context)
@@ -212,10 +216,10 @@ namespace Haboob
     }
 
     // -ve values signal "not visible" or "fragment component not updated"
-    float rayClearColour[4] = { cameraWithin ? .001f : -1.f, -1.f, .0f, 1.f };
+    float rayClearColour[4] = { cameraWithin ? .0f : -1.f, -1.f, .0f, 1.f };
     rayTarget.clear(context, rayClearColour);
     rayTarget.setTarget(context, device.getDepthBuffer());
-    context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
+    context->OMSetBlendState(frontRayBlend.Get(), nullptr, ~0);
 
     boundingBox->setVisible(true);
     device.setDepthEnabled(true, false);
@@ -232,10 +236,12 @@ namespace Haboob
       // Prepare to roll back to the previous raster state
       auto previousRasterState = device.getRasterState();
       
+      context->OMSetBlendState(backRayBlend.Get(), nullptr, ~0);
+
       // Cull front face and render the backface as a 'mask'
       device.setCullBackface(false); 
       device.setCull(true);
-      device.setDepthEnabled(false);
+      device.setDepthEnabled(false, false);
 
       // Need to read the depth so either the bounds max or depth is rendered!
       ID3D11ShaderResourceView* textureView = gbuffer.getNormalDepthTarget().getShaderView();

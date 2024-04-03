@@ -218,7 +218,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   }
   
   // Utilise the rasterization pass to fetch screen coordinates
-  float2 normScreen = float2(rayParams.z, normToSigned(rayParams.w - 1.));
+  float2 normScreen = float2(rayParams.z, rayParams.w);
   
   // Form a ray from the screen
   Ray ray;

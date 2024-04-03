@@ -53,7 +53,7 @@ namespace Haboob
     HRESULT resize(ID3D11Device* device, UInt width, UInt height);
 
     // Renders from the GBuffer into the lit buffer
-    void lightPass(ID3D11DeviceContext* context, ID3D11Buffer* lightbuffer, ID3D11Buffer* lightCameraBuffer, ID3D11ShaderResourceView* lightShadowMap, ID3D11SamplerState* shadowSampler);
+    void lightPass(ID3D11DeviceContext* context, ID3D11Buffer* lightbuffer, ID3D11Buffer* lightCameraBuffer, ID3D11ShaderResourceView* lightShadowMap, ID3D11ShaderResourceView* beerShadowMap, ID3D11SamplerState* shadowSampler);
     // Tone maps the lit buffer
     void finalLitPass(ID3D11DeviceContext* context);
     // Renders to another target using the lit texture

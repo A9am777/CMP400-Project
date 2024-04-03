@@ -253,6 +253,8 @@ namespace Haboob
       shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
       shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
       shaderManager.setMacro("APPLY_UPSCALE", std::to_string(upscaleTracing));
+      shaderManager.setMacro("APPLY_BSM", std::to_string(useBSM));
+      shaderManager.setMacro("APPLY_IMPROVE_BSM", std::to_string(useImprovedBSM));
       shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
     }
 
@@ -393,7 +395,7 @@ namespace Haboob
     scene.setCamera(&mainCamera);
 
     // Basic lit pass
-    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), light.getShadowSampler().Get());
+    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), raymarchShader.getBSMResource(), light.getShadowSampler().Get());
 
     // Render the volume
     {
@@ -576,6 +578,8 @@ namespace Haboob
     showBoundingBoxes = false;
     showMasks = false;
     showRayTravel = false;
+    useBSM = true;
+    useImprovedBSM = true;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -938,6 +942,14 @@ namespace Haboob
         new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyConeTrace", "If cone tracing should be used for anti-aliasing", { "uct" }), 
         &coneTrace))
         ->setName("Apply Cone Tracing"));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyBSM", "If the beer shadow map should be used as part of lighting", { "ubsm" }),
+        &useBSM))
+        ->setName("Apply BSM"));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyImprovedBSM", "If the better beer shadow map model should be used as part of lighting", { "uibsm" }),
+        &useImprovedBSM))
+        ->setName("Apply Improved BSM"));
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
         new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyUpscaleTrace", "If upscaling should be used for raymarching", { "uqt" }),
         &upscaleTracing))

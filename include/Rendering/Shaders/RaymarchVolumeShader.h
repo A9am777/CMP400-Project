@@ -163,6 +163,7 @@ namespace Haboob
     inline MeshInstance<VertexType>* getBox() { return boundingBox; }
     inline MarchVolumeDispatchInfo& getMarchInfo() { return marchInfo; }
     inline BasicOptics& getOpticsInfo() { return opticsInfo; }
+    inline ID3D11ShaderResourceView* getBSMResource() { return bsmTarget.getShaderView(); }
 
     void buildSpectralMatrices();
 
@@ -171,7 +172,8 @@ namespace Haboob
 
     // Optimisations
     MeshInstance* boundingBox;
-    ComPtr<ID3D11BlendState> additiveBlend;
+    ComPtr<ID3D11BlendState> frontRayBlend;
+    ComPtr<ID3D11BlendState> backRayBlend;
     ComPtr<ID3D11SamplerState> pixelSamplerState;
     Shader* frontRayVisibilityPixelShader;
     Shader* backRayVisibilityPixelShader;

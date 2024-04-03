@@ -112,6 +112,8 @@ namespace Haboob
     bool showBoundingBoxes;
     bool showMasks;
     bool showRayTravel;
+    bool useBSM;
+    bool useImprovedBSM;
 
     // Rendering device
     DisplayDevice device;

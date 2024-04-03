@@ -9,7 +9,7 @@ namespace Haboob
     farZ = 15.f;
     ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
 
-    renderPosition = { 6.f, 1.f, .0f };
+    renderPosition = { .0f, 4.f, .0f };
   }
 
   HRESULT Light::create(ID3D11Device* device, UInt width, UInt height)
@@ -41,9 +41,10 @@ namespace Haboob
       ZeroMemory(&samplerDesc, sizeof(D3D11_SAMPLER_DESC));
 
       samplerDesc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-      samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-      samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-      samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+      samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+      samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
+      samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+      samplerDesc.BorderColor[0] = samplerDesc.BorderColor[1] = samplerDesc.BorderColor[2] = samplerDesc.BorderColor[3] = 1.;
       samplerDesc.MipLODBias = 0.0f;
       samplerDesc.MaxAnisotropy = 1;
       samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
@@ -175,7 +176,7 @@ namespace Haboob
     forwardLoad = XMVector3Normalize(forwardLoad);
 
     // TODO: for some reason this doesn't exactly work
-    camera.setView(XMMatrixLookToLH(positionLoad, forwardLoad, upLoad));
+    //camera.setView(XMMatrixLookToLH(positionLoad, forwardLoad, upLoad));
   }
 
 }
