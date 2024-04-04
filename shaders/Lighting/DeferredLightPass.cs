@@ -82,7 +82,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   shadowValue = max(1. - insideBox3D(float3(lightSpace.xyz), float3(0, 0, 0), float3(1, 1, 1)), shadowValue);
   
   #if APPLY_BSM
-  float mapDepth = length(lightMap.xyz - world.xyz);
+  float mapDepth = max(dot(world.xyz - lightMap.xyz, light.direction.xyz), .0);
   #if APPLY_UPSCALE
   float4 beerSample = beerMapTex.SampleLevel(shadowSampler, lightSpace.xy * .5, .5);
   #else
