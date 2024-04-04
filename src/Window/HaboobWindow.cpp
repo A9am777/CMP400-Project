@@ -85,13 +85,13 @@ namespace Haboob
         typedef MeshInstance<VertexType> Instance;
         
         Instance* instance = new Instance(&sphereMesh);
-        instance->getPosition() = { .0f, .0f, 2.5f };
+        instance->getPosition() = { .0f, .0f, .9f };
         scene.addObject(instance);
 
         instance = new Instance(&planeMesh);
         instance->getRotation() = { .707f, .0f, .0f, .707f };
-        instance->getPosition() = { .0f, -1.f, .0f };
-        instance->getScale() = { 5.f, 5.f, 1.f };
+        instance->getPosition() = { -1.f, 3.4f, .75f };
+        instance->getScale() = { 22.f, 22.f, 1.f };
         scene.addObject(instance);
 
         instance = new Instance(&cubeMesh);
@@ -104,6 +104,9 @@ namespace Haboob
         instance->getScale() = { 3.f, 3.f, 3.f };
         scene.addObject(instance);
         raymarchShader.setBox(instance);
+
+        light.getForward() = {.0f, .0f, 1.f, 1.f};
+        light.getRenderPosition() = {.0f, .0f, -1.6f};
       }
     }
 
@@ -355,7 +358,6 @@ namespace Haboob
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // Shadowmap pass
-    light.rebuildLightBuffers(device.getContext().Get());
     light.setTarget(context);
     scene.setCamera(&light.getCamera());
     scene.draw(context, false);
@@ -489,6 +491,8 @@ namespace Haboob
     {
       ImGui::Text("FPS: %f", fps);
       ImGui::Text("Hello World");
+
+      ImGui::DragFloat3("Light Render Pos", &light.getRenderPosition().x, .1f);
 
       if (env)
       {

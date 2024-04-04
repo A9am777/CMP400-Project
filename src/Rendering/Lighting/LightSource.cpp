@@ -5,8 +5,8 @@ namespace Haboob
 {
   Light::Light()
   {
-    nearZ = .01f;
-    farZ = 15.f;
+    nearZ = .0f;
+    farZ = 10.f;
     ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
 
     renderPosition = { .0f, 4.f, .0f };
@@ -176,7 +176,7 @@ namespace Haboob
     forwardLoad = XMVector3Normalize(forwardLoad);
 
     // TODO: for some reason this doesn't exactly work
-    //camera.setView(XMMatrixLookToLH(positionLoad, forwardLoad, upLoad));
+    camera.setView(XMMatrixLookToLH(positionLoad, forwardLoad, upLoad));
   }
 
 }
