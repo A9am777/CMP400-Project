@@ -86,7 +86,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
 {
   #if APPLY_UPSCALE
   // Using 1/4 rays over 1/4 of the screen
-  int2 screenPosition = threadID.xy * 2;
+  int2 screenPosition = threadID.xy * 2.;
   
   // Fetch parameters that have been fed in (over the 2x2 pixel area)
   float4 rayParams = rays[screenPosition];
@@ -131,7 +131,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     directionPointTarget = mul(directionPointTarget, camera.inverseViewProjectionMatrix);
     fromHomogeneous(directionPointTarget);
     
-    float4 testZPlane = float4(normScreen, 0, 1.);
+    float4 testZPlane = float4(normScreen, .0, 1.);
     testZPlane = mul(testZPlane, camera.inverseViewProjectionMatrix);
     fromHomogeneous(testZPlane);
     
@@ -180,5 +180,5 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   }
   
   // min-Z, Z-range, integrated density, integrated angstrom
-  bsmOut[threadID.xy] = float4(rayZMapDepth, rayMaxDepth, 10 * integrate(absorptionInte, ray.travelDistance), 10 * integrate(angstromInte, ray.travelDistance));
+  bsmOut[threadID.xy] = float4(rayZMapDepth, rayMaxDepth, opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance), opticalInfo.scatterAngstromExponent * integrate(angstromInte, ray.travelDistance));
 }

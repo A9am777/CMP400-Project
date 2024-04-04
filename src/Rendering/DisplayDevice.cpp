@@ -189,7 +189,8 @@ namespace Haboob
 
   HRESULT DisplayDevice::swapBuffer(UINT flags)
   {
-    return swapChain->Present(1, flags);
+    // Present without any synchronisation
+    return swapChain->Present(0, flags);
   }
 
   void DisplayDevice::setRasterState(RasterFlags newState, bool force)

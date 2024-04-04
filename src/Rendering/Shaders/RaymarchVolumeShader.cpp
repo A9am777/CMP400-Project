@@ -261,6 +261,7 @@ namespace Haboob
 
     renderer.unbind(context);
 
+    boundingBox->setVisible(false);
     context->OMSetBlendState(nullptr, nullptr, ~0);
     device.setBackBufferTarget();
   }

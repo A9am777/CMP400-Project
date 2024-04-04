@@ -85,28 +85,45 @@ namespace Haboob
         typedef MeshInstance<VertexType> Instance;
         
         Instance* instance = new Instance(&sphereMesh);
-        instance->getPosition() = { .0f, .0f, .9f };
+        instance->getPosition() = { .0f, .55f, 6.4f };
+        scene.addObject(instance);
+
+        instance = new Instance(&sphereMesh);
+        instance->getPosition() = { .6f, -.05f, .8f };
+        instance->getScale() = { .3f, .3f, .3f };
+        scene.addObject(instance);
+
+        instance = new Instance(&sphereMesh);
+        instance->getPosition() = { -.6f, .05f, 2.45f };
+        instance->getScale() = { .25f, .45f, .3f };
+        scene.addObject(instance);
+
+        instance = new Instance(&planeMesh);
+        instance->getRotation() = { .0f, .0f, .707f, .707f };
+        instance->getPosition() = { -1.f, 3.4f, 7.75f };
+        instance->getScale() = { 22.f, 22.f, 1.f };
         scene.addObject(instance);
 
         instance = new Instance(&planeMesh);
         instance->getRotation() = { .707f, .0f, .0f, .707f };
-        instance->getPosition() = { -1.f, 3.4f, .75f };
+        instance->getPosition() = { .0f, -1.41f, .0f };
         instance->getScale() = { 22.f, 22.f, 1.f };
         scene.addObject(instance);
 
         instance = new Instance(&cubeMesh);
-        instance->getPosition() = { -2.f, 1.5f, .0f };
+        instance->getPosition() = { -2.f, 1.5f, 2.f };
         scene.addObject(instance);
 
         // Haboob volume
         instance = new Instance(&sphereMesh);
-        instance->getPosition() = { .0f, .0f, .0f };
+        instance->getRotation() = { .0f, .707f, .0f, .707f };
+        instance->getPosition() = { .0f, .0f, 2.f };
         instance->getScale() = { 3.f, 3.f, 3.f };
         scene.addObject(instance);
         raymarchShader.setBox(instance);
 
         light.getForward() = {.0f, .0f, 1.f, 1.f};
-        light.getRenderPosition() = {.0f, .0f, -1.6f};
+        light.getRenderPosition() = {.0f, .0f, .0f};
       }
     }
 
@@ -269,7 +286,8 @@ namespace Haboob
       shaderManager.setMacro("SHOW_RAY_TRAVEL", std::to_string(showRayTravel));
     }
 
-    shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
+    shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(15.));
+    shaderManager.setMacro("SHADOW_BIAS", std::to_string(.05));
 
     // If macros changed, recompile shaders!
     shaderManager.bakeMacros(device.getDevice().Get());
@@ -362,6 +380,17 @@ namespace Haboob
     scene.setCamera(&light.getCamera());
     scene.draw(context, false);
 
+    // Generate the BSM
+    {
+      // Initial raymarch optimisation passes
+      raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&light.getRenderPosition()));
+
+      // Raymarch!
+      raymarchShader.bindSoftShadowMap(context, haboobVolume.getShaderView());
+      raymarchShader.render(context);
+      raymarchShader.unbindSoftShadowMap(context);
+    }
+
     // Full pass
     scene.setCamera(&mainCamera);
     scene.rebuildCameraBuffer(context);
@@ -381,18 +410,6 @@ namespace Haboob
     ZoneNamed(RenderOverlay, true);
 
     auto context = device.getContext().Get();
-
-    // Generate the BSM
-    {
-      // Initial raymarch optimisation passes
-      scene.setCamera(&light.getCamera());
-      raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&light.getRenderPosition()));
-
-      // Raymarch!
-      raymarchShader.bindSoftShadowMap(context, haboobVolume.getShaderView());
-      raymarchShader.render(context);
-      raymarchShader.unbindSoftShadowMap(context);
-    }
 
     scene.setCamera(&mainCamera);
 

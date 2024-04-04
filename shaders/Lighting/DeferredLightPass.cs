@@ -8,6 +8,7 @@
   #define APPLY_IMPROVE_BSM 1
   #define APPLY_BSM 1
   #define SHADOW_EXPONENT 100.
+  #define SHADOW_BIAS .05
 #endif
 
 cbuffer LightSlot : register(b0)
@@ -58,7 +59,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // it is orthographic so z can be used
   float4 lightSpace = mul(world, lightCamera.viewMatrix);
   lightSpace = mul(lightSpace, lightCamera.projectionMatrix);
-  //lightSpace = lightSpace / lightSpace.w;
   
   #if APPLY_UPSCALE
   float4 lightMap = mul(float4(lightSpace.xy, .0, 1.), lightCamera.inverseViewProjectionMatrix);
@@ -68,27 +68,28 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   //lightMap /= lightMap.w;
   
   // Convert from NDC to texture coords
-  float2 capture = lightSpace.xy;
-  lightSpace.xy += float2(1.0f, 1.0f); //Translate from [-1, 1] -> [0, 2]
-  lightSpace.xy *= float2(0.5f, 0.5f); //Scale from [0, 2] -> [0, 1]
-  
-  
-  
+  lightSpace.xy *= float2(.5, .5); // Scale from [-1, 1] -> [-.5, .5]
+  lightSpace.xy += float2(.5, .5); //Translate from [-.5, .5] -> [0, 1]
   lightSpace.y = 1.0f - lightSpace.y; //Flip y axis
   
   // Sample and apply exponential shadow map
   float shadowSample = depthMapTex.SampleLevel(shadowSampler, lightSpace.xy, .5).r;
-  float shadowValue = saturate(exp(SHADOW_EXPONENT * (shadowSample - lightSpace.z + 0.01f)));
+  float shadowValue = saturate(exp(SHADOW_EXPONENT * (shadowSample - lightSpace.z + SHADOW_BIAS)));
   shadowValue = max(1. - insideBox3D(float3(lightSpace.xyz), float3(0, 0, 0), float3(1, 1, 1)), shadowValue);
   
+  
+  float3 lightPlanePosition = -float3(lightCamera.viewMatrix._m30, lightCamera.viewMatrix._m31, lightCamera.viewMatrix._m32);
   #if APPLY_BSM
-  float mapDepth = max(dot(world.xyz - lightMap.xyz, light.direction.xyz), .0);
+  float mapDepth = dot(world.xyz - lightPlanePosition, light.direction.xyz);
+  
+  float3 BSMspace = lightSpace.xyz;
   #if APPLY_UPSCALE
-  float4 beerSample = beerMapTex.SampleLevel(shadowSampler, lightSpace.xy * .5, .5);
-  #else
-  float4 beerSample = beerMapTex.SampleLevel(shadowSampler, lightSpace.xy, .5);
+  BSMspace.xy *= .5;
   #endif
+  
   // min-Z, Z-range, integrated density, integrated angstrom
+  float4 beerSample = beerMapTex.SampleLevel(shadowSampler, BSMspace.xy, .0);
+  
   float opticalValue = (mapDepth - beerSample.r) / beerSample.g;
   opticalValue = saturate(opticalValue);
   #if APPLY_IMPROVE_BSM
@@ -96,7 +97,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   #endif
   float opticalDepth = opticalValue * beerSample.b;
   
-  shadowValue *= blTransmission(opticalDepth);
+  shadowValue *= max(1. - insideBox3D(lightSpace.xyz, float3(0.01, 0.01, 0), float3(.98, .98, 1)), blTransmission(opticalDepth));
   #endif
   
   // Compute the shadow + half lambert irradiance
