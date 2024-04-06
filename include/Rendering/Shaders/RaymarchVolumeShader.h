@@ -57,23 +57,23 @@ namespace Haboob
     public:
     struct HaboobRadial
     {
-      float roofGradient = -3.87f;
-      float exponentialRate = 20.f;
+      float roofGradient = -3.58f;
+      float exponentialRate = 8.36f;
       float exponentialScale = .22f;
-      float rOffset = .0f;
-      float noseHeight = .34f;
-      float blendHeight = .22f;
-      float blendRate = .25f;
+      float rOffset = .36f;
+      float noseHeight = .19f;
+      float blendHeight = .87f;
+      float blendRate = 1.45f;
       float padding = .0f;
     };
 
     struct HaboobDistribution
     {
-      float falloffScale = .4f;
-      float heightScale = 1.3f;
-      float heightExponent = .2f;
-      float angleRange = 4.2f;
-      float anglePower = 3.f;
+      float falloffScale = .22f;
+      float heightScale = 5.52f;
+      float heightExponent = .74f;
+      float angleRange = 4.33f;
+      float anglePower = 3.26f;
       XMFLOAT3 padding;
     };
 
@@ -92,8 +92,8 @@ namespace Haboob
 
       float fbmOffset = .1f;
       float fbmScale = .4f;
-      float wackyPower = .8f;
-      float wackyScale = .6f;
+      float wackyPower = 10.f;
+      float wackyScale = .31f;
 
       HaboobRadial radial;
       HaboobDistribution distribution;
