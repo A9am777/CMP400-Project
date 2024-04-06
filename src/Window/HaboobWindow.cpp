@@ -89,12 +89,12 @@ namespace Haboob
         scene.addObject(instance);
 
         instance = new Instance(&sphereMesh);
-        instance->getPosition() = { .6f, -.05f, .8f };
+        instance->getPosition() = { .4f, -.5f, .8f };
         instance->getScale() = { .3f, .3f, .3f };
         scene.addObject(instance);
 
         instance = new Instance(&sphereMesh);
-        instance->getPosition() = { -.6f, .05f, 2.45f };
+        instance->getPosition() = { -.65f, .15f, 1.1f };
         instance->getScale() = { .25f, .45f, .3f };
         scene.addObject(instance);
 
@@ -116,9 +116,9 @@ namespace Haboob
 
         // Haboob volume
         instance = new Instance(&sphereMesh);
-        instance->getRotation() = { .0f, .707f, .0f, .707f };
-        instance->getPosition() = { .0f, .0f, 2.f };
-        instance->getScale() = { 3.f, 3.f, 3.f };
+        instance->getRotation() = { .0f, .5f, .0f, .866f };
+        instance->getPosition() = { .0f, .4f, .65f };
+        instance->getScale() = { 4.f, 4.f, 4.f };
         scene.addObject(instance);
         raymarchShader.setBox(instance);
 
@@ -557,8 +557,11 @@ namespace Haboob
     XMStoreFloat3(&mainCamera.getPosition(), cameraPosition);
     mainCamera.setView(XMMatrixLookToLH(cameraPosition, cameraForward, up));
 
+    // Sometimes we want to slow down and focus on a part
+    float seekAngleCoefficient = (.1f + std::pow(std::cos(2.f * orbitProgress), 4.f));
+
     // Only progress w.r.t. delta if we are looking (otherwise a testing-stable environment is necessary)
-    orbitProgress += showWindow ? orbitStep * dtConsidered : orbitStep;
+    orbitProgress += showWindow ? orbitStep * dtConsidered * seekAngleCoefficient : orbitStep;
   }
 
   void HaboobWindow::setupDefaults()
@@ -580,8 +583,8 @@ namespace Haboob
 
     // Camera orbit (frame locked)
     cameraOrbit = false;
-    orbitLookAt = { 0, 0, 0 };
-    orbitAxis = { .0f, 1.f, 1.f };
+    orbitLookAt = { .0f, 0.1f, 0.2f };
+    orbitAxis = { .0f, 1.f, .2f };
     orbitRadius = 10.f;
     orbitStep = .011f;
     orbitProgress = .0f;
@@ -621,12 +624,12 @@ namespace Haboob
       opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
       opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
       opticsInfo.phaseBlendWeightTerms = { .2f, .2f, .2f, .2f, };
-      opticsInfo.scatterAngstromExponent = 9.1f;
+      opticsInfo.scatterAngstromExponent = 8.1f;
 
       opticsInfo.ambientFraction = { .8f, .8f, .8f, .8f, };
-      opticsInfo.absorptionAngstromExponent = 34.1f;
+      opticsInfo.absorptionAngstromExponent = 3.1f;
       opticsInfo.powderCoefficient = .035f;
-      opticsInfo.attenuationFactor = 24.f;
+      opticsInfo.attenuationFactor = 29.1f;
     }
 
     raymarchShader.getMarchInfo().iterations = 26;
