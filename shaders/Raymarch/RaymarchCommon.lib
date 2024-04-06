@@ -79,7 +79,40 @@ struct SimpsonsIntegrator // Simpsons rule
   uint count;
 };
 
+struct SimpsonsIntegrator4 // Simpsons rule (x4)
+{
+  float4 firstTerms;
+  float4 lastTerms;
+  float4 odds;
+  float4 evens;
+  uint count;
+};
+
 static float PI = radians(180.);
+
+void append4(inout SimpsonsIntegrator4 inte, float4 values)
+{
+  inte.lastTerms = values;
+  if (inte.count % 2 == 0)
+  {
+    inte.evens += values;
+  }
+  else
+  {
+    inte.odds += values;
+  }
+  
+  ++inte.count;
+}
+
+float4 integrate4(inout SimpsonsIntegrator4 inte, float range)
+{
+  float stepSize = range / float(inte.count);
+  float4 results = inte.firstTerms + inte.lastTerms;
+  results += 4. * inte.odds;
+  results += 2. * (inte.evens - inte.lastTerms);
+  return results * stepSize / 3.;
+}
 
 void append(inout SimpsonsIntegrator inte, float value)
 {
@@ -93,7 +126,7 @@ void append(inout SimpsonsIntegrator inte, float value)
     inte.odds += value;
   }
   
-  inte.count++;
+  ++inte.count;
 }
 
 float integrate(inout SimpsonsIntegrator inte, float range)

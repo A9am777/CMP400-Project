@@ -7,13 +7,20 @@
   #define APPLY_SPECTRAL 1
   #define APPLY_CONE_TRACE 1
   #define APPLY_UPSCALE 1
+  #define APPLY_IMPROVE_BSM 1
+  #define APPLY_BSM 1
+  
   #define MARCH_MANUAL 0
   #define MARCH_STEP_COUNT 24
+
   #define SHOW_DENSITY 0
   #define SHOW_ANGSTROM 0
   #define SHOW_SAMPLE_LEVEL 0
   #define SHOW_MASK 0
   #define SHOW_RAY_TRAVEL 0
+
+  #define SHADOW_EXPONENT 100.
+  #define SHADOW_BIAS .05
 #endif
 
 RWTexture2D<float4> screenOut : register(u0);
@@ -183,6 +190,7 @@ float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
 
 #define Phase(angularDistance, anisotropicTerms) hgScatter(angularDistance, anisotropicTerms)
 #define Transmission(opticalDepths) bpTransmission(opticalDepths)
+#define Integrator4 SimpsonsIntegrator4
 #define Integrator SimpsonsIntegrator
 
 [numthreads(16, 16, 1)]
@@ -267,10 +275,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   Integrator absorptionInte = { 0, 0, 0, 0, 0 }; // Keep distinct from transmission
   Integrator angstromInte = { 0, 0, 0, 0, 0 };
   // Spectral CIE X1YZX2
-  Integrator irradianceInteX = { 0, 0, 0, 0, 0 };
-  Integrator irradianceInteY = { 0, 0, 0, 0, 0 };
-  Integrator irradianceInteZ = { 0, 0, 0, 0, 0 };
-  Integrator irradianceInteX2 = { 0, 0, 0, 0, 0 };
+  Integrator4 irradianceInte;
+  irradianceInte.count = 0;
+  irradianceInte.evens = irradianceInte.odds = irradianceInte.firstTerms = irradianceInte.lastTerms = ZERO_VEC;
   
   // Must not unroll due to iterative sampling
   [loop]
@@ -305,10 +312,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
       irradianceSample = Transmission(referenceOpticalDepth) * Transmission(referenceScatterOpticalDepth) * (ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms));
     #endif
       
-    append(irradianceInteX, irradianceSample.x);
-    append(irradianceInteY, irradianceSample.y);
-    append(irradianceInteZ, irradianceSample.z);
-    append(irradianceInteX2, irradianceSample.w);
+    append4(irradianceInte, irradianceSample);
     
     // March again!
     march(ray, params.marchZStep);
@@ -336,5 +340,6 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   float finalTransmission = blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance));
   
   // Set as irradiance from the volume with alpha = background transmission
-  screenOut[threadID.xy] = float4(integrate(irradianceInteX, ray.travelDistance) + integrate(irradianceInteX2, ray.travelDistance), integrate(irradianceInteY, ray.travelDistance), integrate(irradianceInteZ, ray.travelDistance), finalTransmission);
+  float4 finalIrradiance = integrate4(irradianceInte, ray.travelDistance);
+  screenOut[threadID.xy] = float4(finalIrradiance.x + finalIrradiance.w, finalIrradiance.yz, finalTransmission);
 }
