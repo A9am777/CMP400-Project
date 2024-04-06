@@ -74,8 +74,7 @@ struct SimpsonsIntegrator // Simpsons rule
 {
   float firstTerm;
   float lastTerm;
-  float odds;
-  float evens;
+  float termBuckets[2];
   uint count;
 };
 
@@ -83,8 +82,7 @@ struct SimpsonsIntegrator4 // Simpsons rule (x4)
 {
   float4 firstTerms;
   float4 lastTerms;
-  float4 odds;
-  float4 evens;
+  float4 termBuckets[2];
   uint count;
 };
 
@@ -93,14 +91,11 @@ static float PI = radians(180.);
 void append4(inout SimpsonsIntegrator4 inte, float4 values)
 {
   inte.lastTerms = values;
-  if (inte.count % 2 == 0)
-  {
-    inte.evens += values;
-  }
-  else
-  {
-    inte.odds += values;
-  }
+  
+  // Append depending on parity
+  float4 buckets[2] = inte.termBuckets;
+  buckets[inte.count & 0x01] += values;
+  inte.termBuckets = buckets;
   
   ++inte.count;
 }
@@ -109,22 +104,19 @@ float4 integrate4(inout SimpsonsIntegrator4 inte, float range)
 {
   float stepSize = range / float(inte.count);
   float4 results = inte.firstTerms + inte.lastTerms;
-  results += 4. * inte.odds;
-  results += 2. * (inte.evens - inte.lastTerms);
+  results += 4. * inte.termBuckets[1]; // Odds
+  results += 2. * (inte.termBuckets[0] - inte.lastTerms); // Evens
   return results * stepSize / 3.;
 }
 
 void append(inout SimpsonsIntegrator inte, float value)
 {
   inte.lastTerm = value;
-  if (inte.count % 2 == 0)
-  {
-    inte.evens += value;
-  }
-  else
-  {
-    inte.odds += value;
-  }
+  
+  // Append depending on parity
+  float buckets[2] = inte.termBuckets;
+  buckets[inte.count & 0x01] += value;
+  inte.termBuckets = buckets;
   
   ++inte.count;
 }
@@ -133,8 +125,8 @@ float integrate(inout SimpsonsIntegrator inte, float range)
 {
   float stepSize = range / float(inte.count);
   float result = inte.firstTerm + inte.lastTerm;
-  result += 4. * inte.odds;
-  result += 2 * (inte.evens - inte.lastTerm);
+  result += 4. * inte.termBuckets[1]; // Odds
+  result += 2 * (inte.termBuckets[0] - inte.lastTerm); // Evens
   return result * stepSize / 3.;
 }
 

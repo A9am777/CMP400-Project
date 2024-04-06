@@ -277,7 +277,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Spectral CIE X1YZX2
   Integrator4 irradianceInte;
   irradianceInte.count = 0;
-  irradianceInte.evens = irradianceInte.odds = irradianceInte.firstTerms = irradianceInte.lastTerms = ZERO_VEC;
+  irradianceInte.termBuckets[0] = irradianceInte.termBuckets[1] = irradianceInte.firstTerms = irradianceInte.lastTerms = ZERO_VEC;
   
   // Must not unroll due to iterative sampling
   [loop]
