@@ -1,4 +1,5 @@
 #include "../Utility/MeshCommon.lib"
+#include "../Utility/Globals.lib"
 #include "LightStructs.lib"
 #include "LightCommon.lib"
 
@@ -29,13 +30,6 @@ Texture2D<float4> normalTex : register(t1);
 Texture2D<float4> worldTex : register(t2);
 Texture2D<float4> depthMapTex : register(t3);
 Texture2D<float4> beerMapTex : register(t4);
-
-// Test
-float insideBox3D(float3 v, float3 bottomLeft, float3 topRight)
-{
-  float3 s = step(bottomLeft, v) - step(topRight, v);
-  return s.x * s.y * s.z;
-}
 
 // Beer-Lambert law
 float blTransmission(float opticalDepth)
@@ -73,9 +67,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   lightSpace.y = 1.0f - lightSpace.y; //Flip y axis
   
   // Sample and apply exponential shadow map
-  float shadowSample = depthMapTex.SampleLevel(shadowSampler, lightSpace.xy, .5).r;
+  float shadowSample = depthMapTex.SampleLevel(shadowSampler, lightSpace.xy, .0).r;
   float shadowValue = saturate(exp(SHADOW_EXPONENT * (shadowSample - lightSpace.z + SHADOW_BIAS)));
-  shadowValue = max(1. - insideBox3D(float3(lightSpace.xyz), float3(0, 0, 0), float3(1, 1, 1)), shadowValue);
+  shadowValue = max(outsideBox3D(float3(lightSpace.xyz), float3(0, 0, 0), float3(1, 1, 1)), shadowValue);
   
   
   float3 lightPlanePosition = -float3(lightCamera.viewMatrix._m30, lightCamera.viewMatrix._m31, lightCamera.viewMatrix._m32);
@@ -97,7 +91,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   #endif
   float opticalDepth = opticalValue * beerSample.b;
   
-  shadowValue *= max(1. - insideBox3D(lightSpace.xyz, float3(0.01, 0.01, 0), float3(.98, .98, 1)), blTransmission(opticalDepth));
+  shadowValue *= max(outsideBox3D(lightSpace.xyz, float3(0.01, 0.01, 0), float3(.98, .98, 1)), blTransmission(opticalDepth));
   #endif
   
   // Compute the shadow + half lambert irradiance

@@ -25,7 +25,10 @@
 
 RWTexture2D<float4> screenOut : register(u0);
 Texture3D<float4> volumeTexture : register(t0);
+Texture2D<float4> directShadowTexture : register(t1);
+Texture2D<float4> beerMapTexture : register(t2);
 SamplerState volumeSampler : register(s0);
+SamplerState shadowSampler : register(s1);
 
 cbuffer CameraSlot : register(b0)
 {
@@ -41,6 +44,11 @@ cbuffer MarchSlot : register(b1)
 cbuffer LightSlot : register(b2)
 {
   DirectionalLight light;
+}
+
+cbuffer LightCameraSlot : register(b3)
+{
+  CameraBuffer lightCamera;
 }
 
 // Converts [0, 1] to [-1, 1]
@@ -136,10 +144,34 @@ float4 alphaBlend(float4 foreground, float4 background)
   return foreground * foreground.a + (1. - foreground.a) * background;
 }
 
+float4 getShadowDependents(float4 worldPosition)
+{
+  float4 results = ZERO_VEC;
+  
+  // Fetch the position within the light's view
+  // it is orthographic so z can be used
+  worldPosition = mul(worldPosition, lightCamera.viewMatrix);
+  worldPosition = mul(worldPosition, lightCamera.projectionMatrix);
+  
+  // Convert from NDC to texture coords
+  results.xy = .5 * worldPosition.xy; // Scale from [-1, 1] -> [-.5, .5]
+  results.xy += float2(.5, .5); // Translate from [-.5, .5] -> [0, 1]
+  results.y = 1.0f - results.y; // Flip y axis
+  
+  // Mirror z
+  results.z = worldPosition.z;
+  
+  // Fetch 'linear Z'
+  float3 lightPlanePosition = -float3(lightCamera.viewMatrix._m30, lightCamera.viewMatrix._m31, lightCamera.viewMatrix._m32);
+  results.w = dot(worldPosition.xyz - lightPlanePosition, light.direction.xyz);
+  
+  return results;
+}
+
 // Angstrom's coefficient
 float4x4 spectralScatter(float4x4 relativeWavelengths, float angstromExponent)
 {
-  return pow(relativeWavelengths, -angstromExponent);
+  return pow(relativeWavelengths, -angstromExponent * ONE_MAT);
 }
 
 // Beer-Lambert law
@@ -232,6 +264,10 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   Ray ray;
   float rayMaxDepth = .0;
   
+  // Shadow terms of the ray at each extent (u, v, linear-Z)
+  float4 shadowSpace;
+  float4 deltaShadowSpace;
+  
   ray.pos = float4(normScreen, rayParams.x, 1.);
   {
     float4 directionPointTarget = float4(normScreen, rayParams.y, 1.);
@@ -246,6 +282,12 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     ray.dir = directionPointTarget - ray.pos;
     rayMaxDepth = length(ray.dir);
     ray.dir /= rayMaxDepth;
+    
+    // Catch the shadow terms
+    shadowSpace = getShadowDependents(ray.pos);
+    deltaShadowSpace = getShadowDependents(directionPointTarget);
+    deltaShadowSpace -= shadowSpace;
+    deltaShadowSpace /= rayMaxDepth;
   }
   ray.colour = float4(1., 1., 1., 0.);
   ray.travelDistance = .0;
@@ -274,7 +316,8 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   Integrator absorptionInte = { 0, 0, 0, 0, 0 }; // Keep distinct from transmission
   Integrator angstromInte = { 0, 0, 0, 0, 0 };
-  // Spectral CIE X1YZX2
+  
+  // Spectral CIE X1_Y_Z_X2
   Integrator4 irradianceInte;
   irradianceInte.count = 0;
   irradianceInte.termBuckets[0] = irradianceInte.termBuckets[1] = irradianceInte.firstTerms = irradianceInte.lastTerms = ZERO_VEC;
@@ -295,21 +338,49 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     float referenceOpticalDepth = opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance);
     float referenceAngstromAbsorption = opticalInfo.absorptionAngstromExponent * integrate(angstromInte, ray.travelDistance);
     
-    // TODO: this is the non-constant second path and needs to be replaced!
-    // Lets assume it is the current density along the ray for now
-    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * 2.1;
+    float4 shadowTerms = shadowSpace + deltaShadowSpace * ray.travelDistance;
+    // Sample and apply exponential shadow map
+    float shadowSample1 = directShadowTexture.SampleLevel(shadowSampler, shadowTerms.xy, 1.0).r;
+    
+    float shadowValue = saturate(exp(SHADOW_EXPONENT * (shadowSample1 - shadowTerms.z + SHADOW_BIAS)));
+    shadowValue = max(outsideBox3D(shadowTerms.xyz, ZERO_VEC, ONE_VEC), shadowValue);
+    
+    // min-Z, Z-range, integrated density, integrated angstrom
+    #if APPLY_UPSCALE
+    float4 beerSample = beerMapTexture.SampleLevel(shadowSampler, shadowTerms.xy * .5, .0);
+    #else
+    float4 beerSample = beerMapTexture.SampleLevel(shadowSampler, shadowTerms.xy, .0);
+    #endif
+    
+    // Determine the integrated optical depth + angstrom value along the incoming ray according to the BSM
+    #if APPLY_BSM
+    float bsmValue = (shadowTerms.w - beerSample.r) / beerSample.g;
+    bsmValue = saturate(bsmValue);
+    
+    float bsmAngstrom = bsmValue * beerSample.a;
+    #if APPLY_IMPROVE_BSM
+    bsmValue = smoothstep(.0, 1., bsmValue);
+    #endif
+    float bsmOpticalDepth = bsmValue * beerSample.b;
+    
+    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * bsmOpticalDepth;
+    float referenceScatterAngstrom = opticalInfo.scatterAngstromExponent * bsmAngstrom;
+    #else
+    float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * EULER;
+    float referenceScatterAngstrom = opticalInfo.scatterAngstromExponent * EULER;
+    #endif
     
     // Accumulate intensity as a function of optical thickness
-    float4 irradianceSample;
-    
     #if APPLY_SPECTRAL
-      float4x4 baseRadiance = mul(IDENTITY_MAT, (float1x4)(ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms)));
-      float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, referenceAngstromAbsorption)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, opticalInfo.scatterAngstromExponent));
-      float4x4 integratorRadiance = mul(transmissions, baseRadiance) * opticalInfo.spectralWeights;
+      float4x4 baseRadiance = IDENTITY_MAT;
+      baseRadiance._11_22_33_44 = ambientIrradiance + shadowValue * lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms);
+    
+      float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, referenceAngstromAbsorption)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, referenceScatterAngstrom));
+      float4x4 integratorRadiance = mul(baseRadiance, transmissions) * opticalInfo.spectralWeights;
       
-      irradianceSample = mul(ONE_VEC, integratorRadiance);
+      float4 irradianceSample = mul(integratorRadiance, ONE_VEC);
     #else
-      irradianceSample = Transmission(referenceOpticalDepth) * Transmission(referenceScatterOpticalDepth) * (ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms));
+      float4 irradianceSample = Transmission(referenceOpticalDepth) * Transmission(referenceScatterOpticalDepth) * (ambientIrradiance + lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms));
     #endif
       
     append4(irradianceInte, irradianceSample);

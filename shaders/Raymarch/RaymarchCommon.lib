@@ -86,8 +86,6 @@ struct SimpsonsIntegrator4 // Simpsons rule (x4)
   uint count;
 };
 
-static float PI = radians(180.);
-
 void append4(inout SimpsonsIntegrator4 inte, float4 values)
 {
   inte.lastTerms = values;

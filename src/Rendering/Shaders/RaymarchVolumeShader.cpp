@@ -154,22 +154,28 @@ namespace Haboob
 
     context->CSSetConstantBuffers(1, 1, marchBuffer.GetAddressOf());
     context->CSSetConstantBuffers(2, 1, mainLight->getLightBuffer().GetAddressOf());
+    context->CSSetConstantBuffers(3, 1, mainLight->getLightPerspectiveBuffer().GetAddressOf());
 
     context->CSSetSamplers(0, 1, marchSamplerState.GetAddressOf());
     context->CSSetShaderResources(0, 1, &densityTexResource);
+
+    context->CSSetSamplers(1, 1, mainLight->getShadowSampler().GetAddressOf());
+    auto shadowTextureView = mainLight->getShaderView();
+    context->CSSetShaderResources(1, 1, &shadowTextureView);
+
+    auto bsmTextureView = bsmTarget.getShaderView();
+    context->CSSetShaderResources(2, 1, &bsmTextureView);
   }
 
   void RaymarchVolumeShader::unbindShader(ID3D11DeviceContext* context)
   {
     computeShader->unbindShader(context);
 
-    void* nullpo = nullptr;
+    void* nullpo[4] = { nullptr, nullptr, nullptr, nullptr };
     context->CSSetUnorderedAccessViews(0, 1, (ID3D11UnorderedAccessView**)&nullpo, 0);
-    context->CSSetConstantBuffers(0, 1, (ID3D11Buffer**)&nullpo);
-    context->CSSetConstantBuffers(1, 1, (ID3D11Buffer**)&nullpo);
-    context->CSSetConstantBuffers(2, 1, (ID3D11Buffer**)&nullpo);
-    context->CSSetSamplers(0, 1, (ID3D11SamplerState**)&nullpo);
-    context->CSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
+    context->CSSetConstantBuffers(0, 4, (ID3D11Buffer**)&nullpo);
+    context->CSSetSamplers(0, 2, (ID3D11SamplerState**)&nullpo);
+    context->CSSetShaderResources(0, 3, (ID3D11ShaderResourceView**)&nullpo);
   }
 
   void RaymarchVolumeShader::mirror(ID3D11DeviceContext* context)
@@ -379,13 +385,13 @@ namespace Haboob
       {
         if (wavelet == 1) // Green = linear
         {
-          optics.spectralWeights.m[term][wavelet] = hermitGaussWeights[term] * linearWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
-          optics.spectralWavelengths.m[term][wavelet] = linearAbscissasAdjust(hermitGaussAbscissas[term], distribution);
+          optics.spectralWeights.m[wavelet][term] = hermitGaussWeights[term] * linearWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
+          optics.spectralWavelengths.m[wavelet][term] = linearAbscissasAdjust(hermitGaussAbscissas[term], distribution);
         }
         else // Everything else = logarithmic
         {
-          optics.spectralWeights.m[term][wavelet] = hermitGaussWeights[term] * logWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
-          optics.spectralWavelengths.m[term][wavelet] = logAbscissasAdjust(hermitGaussAbscissas[term], distribution);
+          optics.spectralWeights.m[wavelet][term] = hermitGaussWeights[term] * logWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
+          optics.spectralWavelengths.m[wavelet][term] = logAbscissasAdjust(hermitGaussAbscissas[term], distribution);
         }
       }
     }
