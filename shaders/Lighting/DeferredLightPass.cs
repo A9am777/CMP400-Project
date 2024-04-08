@@ -55,7 +55,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
         float4x4 wavelengths = getSpectralWavelengths(opticalInfo);
   
         // Compute a fast approximation of spectral contributions
-        shadowValues *= blTransmission((float)bsmValues.x * spectralScatter(wavelengths, bsmValues.y))._14_24_34;
+        shadowValues *= blTransmission((float)bsmValues.x * spectralScatter(wavelengths, bsmValues.y))._12_22_32;
       #else
         shadowValues *= blTransmission(bsmValues.x);
       #endif

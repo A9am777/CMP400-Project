@@ -621,14 +621,14 @@ namespace Haboob
       auto& opticsInfo = raymarchShader.getOpticsInfo();
 
       opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
-      opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
-      opticsInfo.phaseBlendWeightTerms = { .2f, .2f, .2f, .2f, };
-      opticsInfo.scatterAngstromExponent = 3.1f;
+      opticsInfo.anisotropicBackwardTerms = { -.6f, -.732f, -.651f, -.735f };
+      opticsInfo.phaseBlendWeightTerms = { .17f, .11f, .2f, .2f, };
+      opticsInfo.scatterAngstromExponent = 2.1f;
 
       opticsInfo.ambientFraction = { .2f, .2f, .2f, .2f, };
-      opticsInfo.absorptionAngstromExponent = 3.1f;
+      opticsInfo.absorptionAngstromExponent = 2.3f;
       opticsInfo.powderCoefficient = .035f;
-      opticsInfo.attenuationFactor = 29.1f;
+      opticsInfo.attenuationFactor = 14.1f;
     }
 
     raymarchShader.getMarchInfo().iterations = 52;
