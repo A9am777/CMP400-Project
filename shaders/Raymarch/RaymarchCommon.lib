@@ -49,7 +49,8 @@ struct BasicOptics
   float4x4 spectralToRGB; // CIEXYZ to linear RGB
   
   float4 ambientFraction;
-  uint4 flags;
+  float referenceWavelength; // The wavelength which the Angstrom exponent is in relation to
+  uint3 flags;
 };
 
 struct MarchParams
@@ -212,7 +213,7 @@ float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
 // Returns spectral weights from Angstrom's coefficient
 float4x4 spectralScatter(float4x4 relativeWavelengths, float angstromExponent)
 {
-  return pow(relativeWavelengths, -angstromExponent * ONE_MAT);
+  return pow(relativeWavelengths, (-angstromExponent) * ONE_MAT);
 }
 
 // Returns values (u, v, z-depth, linear Z) for a world position w.r.t. an orthographic shadow map
@@ -305,6 +306,12 @@ float3 spectralToRGB(in float4 xyzx, in float4x4 transform)
     .0, .0, .0, .0
     ), xyzx).xyz;
   #endif
+}
+
+// Returns the relative spectral wavelengths
+float4x4 getSpectralWavelengths(in BasicOptics opticalInfo)
+{
+  return opticalInfo.spectralWavelengths / opticalInfo.referenceWavelength;
 }
 
 #endif

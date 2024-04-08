@@ -40,10 +40,10 @@ namespace Haboob
     XMFLOAT4X4 spectralToRGB; // CIEXYZ to linear RGB
 
     XMFLOAT4 ambientFraction;
+    float referenceWavelength = 0.743f; // The wavelength which the Angstrom exponent is in relation to
     UINT flagApplyBeer = 1; // Controls whether to apply Beer-Lambert attenuation
     UINT flagApplyHG = 1; // Controls whether to apply the HG phase function
     UINT flagApplySpectral = 1; // Controls whether to integrate over several wavelengths
-    UINT flagUnused = 1;
   };
 
   struct ComprehensiveBufferInfo
@@ -93,7 +93,7 @@ namespace Haboob
 
       float fbmOffset = .1f;
       float fbmScale = .4f;
-      float wackyPower = 10.f;
+      float wackyPower = 5.1f;
       float wackyScale = .31f;
 
       HaboobRadial radial;
@@ -165,6 +165,7 @@ namespace Haboob
     inline MarchVolumeDispatchInfo& getMarchInfo() { return marchInfo; }
     inline BasicOptics& getOpticsInfo() { return opticsInfo; }
     inline ID3D11ShaderResourceView* getBSMResource() { return bsmTarget.getShaderView(); }
+    inline ID3D11Buffer* getMarchBuffer() { return marchBuffer.Get(); }
 
     void buildSpectralMatrices();
 

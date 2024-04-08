@@ -139,14 +139,12 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Determine where the leading edge lies
   float leadingRadius = haboobRadius(cylinderCoord.y);
-  float radius = length(float2(cylinderCoord.x, cylinderCoord.z)) + info.wackyScale * fbm;
+  float radius = length(float2(cylinderCoord.x, cylinderCoord.z)) + info.wackyScale * fbm; // (plus an fBM 'interesting' alteration for exotic outputs)
   float arcAngle = atan2(cylinderCoord.z, -cylinderCoord.x) + 1.57079632679;
   float arcDensity = haboobAngularFlux(arcAngle);
   float radialDensity = simpleBoltzmannFalloff(radius, leadingRadius, info.distribution.falloffScale);
   float heightDensity = haboobVerticalFlux(cylinderCoord.y);
   
-  // Compute the falloff over the square radius (plus an fBM 'interesting' alteration for exotic outputs)
-  //float sphereDensity = saturate(sqrRadius - dot(normalisedLocation, normalisedLocation) - info.wackyScale * pow(abs(fbm), info.wackyPower)) / sqrRadius;
   float density = arcDensity * radialDensity * heightDensity;
   
   VolumeElement element;

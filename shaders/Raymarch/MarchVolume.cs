@@ -197,16 +197,11 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   // Jump ray forward
   march(ray, params.initialStep);
   
-  float4x4 wavelengths = opticalInfo.spectralWavelengths / 0.743f;
-  
   // Directional lighting will have a constant phase along the ray
   float angularDistance = dot(ray.dir.xyz, -light.direction.xyz);
   float4 incomingForwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicForwardTerms) * float4(light.diffuse, light.diffuse.r);
   float4 incomingBackwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicBackwardTerms) * float4(light.diffuse, light.diffuse.r);
   float4 ambientIrradiance = opticalInfo.ambientFraction * float4(light.ambient, light.ambient.r) * Phase(1., opticalInfo.anisotropicForwardTerms);
-  
-  incomingForwardIrradiance *= .25;
-  incomingBackwardIrradiance *= .25;
   
   // Integrated optical depth and angstrom
   Integrator absorptionInte = { 0, 0, 0, 0, 0 };
@@ -257,6 +252,9 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     {
       float4 directIrradiance = ambientIrradiance + shadowValue * lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms);
       #if APPLY_SPECTRAL
+        // Cache the wavelength matrix
+        float4x4 wavelengths = getSpectralWavelengths(opticalInfo);
+      
         // Compute falloff per wavelength
         float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, referenceAngstrom)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, referenceScatterAngstrom));
       

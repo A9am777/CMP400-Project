@@ -23,6 +23,13 @@ float4x4 diagonal(in float4 vec)
   
   return mat;
 }
+float4x4 diagonal(in float val)
+{
+  float4x4 mat = IDENTITY_MAT;
+  mat._11_22_33_44 = float4(val, val, val, val);
+  
+  return mat;
+}
 
 // Returns a blend value for if the position is inside extents (utilising fuzzy logic)
 float insideBox3D(float3 pos, float3 min, float3 max)

@@ -11,14 +11,6 @@ namespace Haboob
   {
     setupDefaults();
 
-    // Produce standalone shaders
-    deferredVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV", true);
-    deferredPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP", true);
-  }
-  HaboobWindow::~HaboobWindow()
-  {
-    delete deferredVertexShader;
-    delete deferredPixelShader;
   }
 
   void HaboobWindow::onStart()
@@ -52,8 +44,6 @@ namespace Haboob
 
       // Initialise all shaders
       {
-        deferredVertexShader->initShader(dev, &shaderManager);
-        deferredPixelShader->initShader(dev, &shaderManager);
         raymarchShader.initShader(dev, &shaderManager);
         haboobVolume.initShader(dev, &shaderManager);
         RenderTarget::copyShader.initShader(dev, &shaderManager);
@@ -277,6 +267,9 @@ namespace Haboob
       shaderManager.setMacro("APPLY_IMPROVE_BSM", std::to_string(useImprovedBSM));
       shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
       shaderManager.setMacro("APPLY_SHADOW", std::to_string(useShadows));
+      shaderManager.setMacro("TEXTURE_GRAPH", std::to_string(textureGraph));
+      shaderManager.setMacro("TEXTURE_NORMALS", std::to_string(textureNormals));
+      shaderManager.setMacro("TEXTURE_WHITE", std::to_string(textureWhite));
     }
 
     {
@@ -415,7 +408,7 @@ namespace Haboob
     scene.setCamera(&mainCamera);
 
     // Basic lit pass
-    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), raymarchShader.getBSMResource(), light.getShadowSampler().Get());
+    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), raymarchShader.getBSMResource(), light.getShadowSampler().Get(), raymarchShader.getMarchBuffer());
 
     // Render the volume
     {
@@ -606,6 +599,9 @@ namespace Haboob
     useBSM = true;
     useImprovedBSM = true;
     useShadows = true;
+    textureGraph = false;
+    textureNormals = false;
+    textureWhite = true;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -785,6 +781,18 @@ namespace Haboob
         new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowRayTravel", "If the renderer should display the distance rays have travelled", { "srt" }),
         &showRayTravel))
         ->setName("Show Ray Travel"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "TextureGrid", "If the renderer should display grid textures", { "tg" }),
+        &textureGraph))
+        ->setName("Texture Grid"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "TextureNorm", "If the renderer should display normal textures", { "tn" }),
+        &textureNormals))
+        ->setName("Texture Norms"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "TextureWhite", "If the renderer should display white textures", { "tw" }),
+        &textureWhite))
+        ->setName("Texture White"));
     }
 
     {
@@ -843,7 +851,7 @@ namespace Haboob
 
       haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.wackyPower))
         ->setName("Haboob Wacky Power (tm)")
-        ->setGUISettings(1.f, .0f, 10.f));
+        ->setGUISettings(.05f, .0f, 10.f));
       haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.wackyScale))
         ->setName("Haboob Wacky Scale (tm)")
         ->setGUISettings(1.f, .0f, 10.f));
@@ -939,6 +947,9 @@ namespace Haboob
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.scatterAngstromExponent))
         ->setName("Scattering angstrom exponent")
         ->setGUISettings(1.f, .0f, 100.f));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.referenceWavelength))
+        ->setName("Reference wavelength")
+        ->setGUISettings(.001f, .0f, 1.f));
 
       // Transmission
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.absorptionAngstromExponent))

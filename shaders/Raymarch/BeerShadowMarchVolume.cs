@@ -2,11 +2,6 @@
 #include "../Lighting/LightStructs.lib"
 
 #ifndef MACRO_MANAGED
-#define APPLY_BEER 1
-#define APPLY_HG 1
-#define APPLY_SPECTRAL 1
-#define APPLY_CONE_TRACE 1
-#define APPLY_UPSCALE 1
 #define MARCH_MANUAL 0
 #define MARCH_STEP_COUNT 24
 #define SHOW_DENSITY 0

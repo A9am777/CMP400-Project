@@ -9,34 +9,34 @@ namespace Haboob
     {
       // Back
       {{-scale, -scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
-      {{scale, -scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
-      {{scale, scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
-      {{-scale, scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
+      {{scale, -scale, -scale}, {1.f, .0f}, {.0f, .0f, -1.f}},
+      {{scale, scale, -scale}, {1.f, 1.f}, {.0f, .0f, -1.f}},
+      {{-scale, scale, -scale}, {.0f, 1.f}, {.0f, .0f, -1.f}},
       // Bottom
       {{scale, -scale, -scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
-      {{-scale, -scale, -scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
-      {{-scale, -scale, scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
-      {{scale, -scale, scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
+      {{-scale, -scale, -scale}, {1.f, .0f}, {.0f, -1.f, 0.f}},
+      {{-scale, -scale, scale}, {1.f, 1.f}, {.0f, -1.f, 0.f}},
+      {{scale, -scale, scale}, {.0f, 1.f}, {.0f, -1.f, 0.f}},
       // Right
       {{scale, -scale, -scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
-      {{scale, -scale, scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
-      {{scale, scale, scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
-      {{scale, scale, -scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
+      {{scale, -scale, scale}, {1.f, .0f}, {1.f, 0.f, 0.f}},
+      {{scale, scale, scale}, {1.f, 1.f}, {1.f, 0.f, 0.f}},
+      {{scale, scale, -scale}, {.0f, 1.f}, {1.f, 0.f, 0.f}},
       // Front
       {{-scale, -scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
-      {{scale, -scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
-      {{scale, scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
-      {{-scale, scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
+      {{scale, -scale, scale}, {1.f, .0f}, {.0f, .0f, 1.f}},
+      {{scale, scale, scale}, {1.f, 1.f}, {.0f, .0f, 1.f}},
+      {{-scale, scale, scale}, {.0f, 1.f}, {.0f, .0f, 1.f}},
       // Top
       {{scale, scale, -scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
-      {{-scale, scale, -scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
-      {{-scale, scale, scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
-      {{scale, scale, scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
+      {{-scale, scale, -scale}, {1.f, .0f}, {.0f, 1.f, 0.f}},
+      {{-scale, scale, scale}, {1.f, 1.f}, {.0f, 1.f, 0.f}},
+      {{scale, scale, scale}, {.0f, 1.f}, {.0f, 1.f, 0.f}},
       // Left
       {{-scale, -scale, -scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}},
-      {{-scale, -scale, scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}},
-      {{-scale, scale, scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}},
-      {{-scale, scale, -scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}}
+      {{-scale, -scale, scale}, {1.f, .0f}, {-1.f, 0.f, 0.f}},
+      {{-scale, scale, scale}, {1.f, 1.f}, {-1.f, 0.f, 0.f}},
+      {{-scale, scale, -scale}, {.0f, 1.f}, {-1.f, 0.f, 0.f}}
     };
 
     static const std::vector<ULong> indices =
