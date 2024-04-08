@@ -386,6 +386,7 @@ namespace Haboob
     }
 
     // Full pass
+    raymarchShader.getBox()->setVisible(showBoundingBoxes);
     scene.setCamera(&mainCamera);
     scene.rebuildCameraBuffer(context);
     gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
