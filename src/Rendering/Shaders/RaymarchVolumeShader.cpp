@@ -395,6 +395,15 @@ namespace Haboob
         }
       }
     }
+
+    // This matrix transforms from the CIEXYZ components to display independent linear RGB (note: column1 = column4)
+    XMMATRIX spectralToRGB = XMMatrixSet(
+      3.2406, -1.5372, -.4986, 3.2406,
+      -.9689, 1.8758, .0415, -.9689,
+      .0557, -.2040, 1.0570, .0557,
+      .0, .0, .0, .0);
+    spectralToRGB = XMMatrixTranspose(spectralToRGB);
+    XMStoreFloat4x4(&optics.spectralToRGB, spectralToRGB);
   }
 
   VolumeGenerationShader::VolumeGenerationShader()

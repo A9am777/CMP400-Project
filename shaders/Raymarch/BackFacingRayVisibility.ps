@@ -1,3 +1,4 @@
+#include "../Utility/Globals.lib"
 #include "../Utility/MeshCommon.lib"
 #include "../Lighting/GBuffer.lib"
 
@@ -12,18 +13,6 @@ struct InputType
 
 Texture2D normalDepthTexture : register(t0);
 SamplerState sampler0 : register(s0);
-
-// Converts [-1, 1] to [0, 1]
-float signedToNorm(float norm)
-{
-  return norm * .5 + .5;
-}
-
-// Converts from screen space to texel space
-float2 screenToTexel(float2 screenspace)
-{
-  return float2(signedToNorm(screenspace.x), signedToNorm(-screenspace.y));
-}
 
 // This shader masks the backface of a bounding box and additively 'appends' the extreme depth
 float4 main(InputType input) : SV_Target

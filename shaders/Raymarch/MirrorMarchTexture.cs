@@ -25,7 +25,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     uv *= .5;
   #endif
   
-  // (more complex behaviour may be performed here)
+  // (more complex behaviour may be performed here, such as spectral blending)
   
   // Simply sample the texture
   float4 appliedOverlay = texture0.SampleLevel(sampler0, uv, .0);

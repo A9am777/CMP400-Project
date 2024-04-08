@@ -37,6 +37,7 @@ namespace Haboob
     float powderCoefficient; // Beers-Powder scaling factor
     XMFLOAT4X4 spectralWavelengths; // Wavelengths to integrate over
     XMFLOAT4X4 spectralWeights; // Spectral integration weights
+    XMFLOAT4X4 spectralToRGB; // CIEXYZ to linear RGB
 
     XMFLOAT4 ambientFraction;
     UINT flagApplyBeer = 1; // Controls whether to apply Beer-Lambert attenuation

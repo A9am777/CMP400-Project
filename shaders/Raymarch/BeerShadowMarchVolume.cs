@@ -38,23 +38,6 @@ cbuffer LightSlot : register(b2)
   DirectionalLight light;
 }
 
-// Converts [0, 1] to [-1, 1]
-float normToSigned(float norm)
-{
-  return (norm - .5) * 2.;
-}
-
-void fromHomogeneous(inout float4 vec)
-{
-  vec = vec / vec.w;
-}
-
-void march(inout Ray ray, float stepSize)
-{
-  ray.pos = ray.pos + ray.dir * stepSize;
-  ray.travelDistance += stepSize;
-}
-
 // Returns the sample level for cone tracing
 float getConeSampleLevel(in Ray ray, float worldToTexels)
 {

@@ -276,6 +276,7 @@ namespace Haboob
       shaderManager.setMacro("APPLY_BSM", std::to_string(useBSM));
       shaderManager.setMacro("APPLY_IMPROVE_BSM", std::to_string(useImprovedBSM));
       shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
+      shaderManager.setMacro("APPLY_SHADOW", std::to_string(useShadows));
     }
 
     {
@@ -604,6 +605,7 @@ namespace Haboob
     showRayTravel = false;
     useBSM = true;
     useImprovedBSM = true;
+    useShadows = true;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -624,15 +626,15 @@ namespace Haboob
       opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
       opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
       opticsInfo.phaseBlendWeightTerms = { .2f, .2f, .2f, .2f, };
-      opticsInfo.scatterAngstromExponent = 8.1f;
+      opticsInfo.scatterAngstromExponent = 3.1f;
 
-      opticsInfo.ambientFraction = { .8f, .8f, .8f, .8f, };
+      opticsInfo.ambientFraction = { .2f, .2f, .2f, .2f, };
       opticsInfo.absorptionAngstromExponent = 3.1f;
       opticsInfo.powderCoefficient = .035f;
       opticsInfo.attenuationFactor = 29.1f;
     }
 
-    raymarchShader.getMarchInfo().iterations = 26;
+    raymarchShader.getMarchInfo().iterations = 52;
   }
 
   void HaboobWindow::setupEnv(Environment* environment)
@@ -974,6 +976,10 @@ namespace Haboob
         new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyImprovedBSM", "If the better beer shadow map model should be used as part of lighting", { "uibsm" }),
         &useImprovedBSM))
         ->setName("Apply Improved BSM"));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyShadows", "If shadowing should be used as part of lighting", { "usm" }),
+        &useShadows))
+        ->setName("Apply Shadows"));
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
         new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyUpscaleTrace", "If upscaling should be used for raymarching", { "uqt" }),
         &upscaleTracing))

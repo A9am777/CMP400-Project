@@ -2,6 +2,21 @@
 #define RAYMARCHCOMMON_H
 #include "../Utility/Globals.lib"
 #include "../Utility/MeshCommon.lib"
+#include "../Lighting/LightStructs.lib"
+
+#ifndef MACRO_MANAGED
+  #define APPLY_BEER 1
+  #define APPLY_HG 1
+  #define APPLY_SPECTRAL 1
+  #define APPLY_CONE_TRACE 1
+  #define APPLY_UPSCALE 1
+  #define APPLY_IMPROVE_BSM 1
+  #define APPLY_BSM 1
+  #define APPLY_SHADOW 1
+
+  #define SHADOW_EXPONENT 100.
+  #define SHADOW_BIAS .05
+#endif
 
 struct MarchVolumeDispatchInfo
 {
@@ -31,6 +46,7 @@ struct BasicOptics
   float powderCoefficient; // Beers-Powder scaling factor
   float4x4 spectralWavelengths; // Wavelengths to integrate over
   float4x4 spectralWeights; // Spectral integration weights
+  float4x4 spectralToRGB; // CIEXYZ to linear RGB
   
   float4 ambientFraction;
   uint4 flags;
@@ -137,6 +153,158 @@ void append(inout RectangleIntegrator inte, float value)
 float integrate(inout RectangleIntegrator inte)
 {
   return inte.total;
+}
+
+// Steps a ray
+void march(inout Ray ray, float stepSize)
+{
+  ray.pos = ray.pos + ray.dir * stepSize;
+  ray.travelDistance += stepSize;
+}
+
+// Beer-Lambert law
+float blTransmission(float opticalDepth)
+{
+  #if APPLY_BEER
+    return exp(-opticalDepth);
+  #else
+    return 1. / (1. + opticalDepth);
+  #endif
+}
+float4x4 blTransmission(float4x4 opticalDepths)
+{
+  #if APPLY_BEER
+    return exp(-opticalDepths);
+  #else
+    return ONE_MAT / (ONE_MAT + opticalDepths);
+  #endif
+}
+
+// Beer-Powder approximation of transmission
+float bpTransmission(float opticalDepth, float powderCoefficient)
+{
+  return blTransmission(opticalDepth) - blTransmission(powderCoefficient * opticalDepth);
+}
+float4x4 bpTransmission(float4x4 opticalDepths, float powderCoefficient)
+{
+  return blTransmission(opticalDepths) - blTransmission(powderCoefficient * opticalDepths);
+}
+
+// Henyey-Greenstein phase function (w.r.t. precomputed angular term)
+float4 hgScatter(float angularDistance, in float4 anisotropicTerms)
+{
+  #if APPLY_HG
+    static float intCoeff = 1. / (4. * PI);
+  
+    float4 numerator = 1. - anisotropicTerms * anisotropicTerms;
+  
+    float4 denominator = anisotropicTerms - FILL_VEC(2.) * angularDistance;
+    denominator = anisotropicTerms * denominator;
+    denominator += ONE_VEC;
+    denominator = pow(denominator, float4(1.5, 1.5, 1.5, 1.5));
+
+    return numerator / denominator;
+  #else
+    return ONE_VEC;
+  #endif
+}
+
+// Returns spectral weights from Angstrom's coefficient
+float4x4 spectralScatter(float4x4 relativeWavelengths, float angstromExponent)
+{
+  return pow(relativeWavelengths, -angstromExponent * ONE_MAT);
+}
+
+// Returns values (u, v, z-depth, linear Z) for a world position w.r.t. an orthographic shadow map
+float4 getShadowDependents(float4 worldPosition, in CameraBuffer lightCamera, in DirectionalLight light)
+{
+  float4 results = ZERO_VEC;
+  
+  // Fetch 'linear Z'
+  float3 lightPlanePosition = -lightCamera.viewMatrix._m30_m31_m32;
+  results.w = dot(worldPosition.xyz - lightPlanePosition, light.direction.xyz);
+  
+  // Fetch the position within the light's view
+  // it is orthographic so z can be used
+  worldPosition = mul(worldPosition, lightCamera.viewMatrix);
+  worldPosition = mul(worldPosition, lightCamera.projectionMatrix);
+  
+  // Convert from NDC to texture coords
+  results.xy = screenToTexel(worldPosition.xy);
+  
+  // Mirror z
+  results.z = worldPosition.z;
+  
+  return results;
+}
+
+// Returns an exponential extinction value
+float getExponentialShadowCoefficient(in float4 shadowTerms, in Texture2D<float4> shadowMap, in SamplerState shadowSampler)
+{
+  #if APPLY_SHADOW
+    // Sample the shadow map
+    float shadowSample = shadowMap.SampleLevel(shadowSampler, shadowTerms.xy, .5).r;
+   
+    // Compute the extinction value
+    float shadowValue = saturate(exp(SHADOW_EXPONENT * (shadowSample - shadowTerms.z + SHADOW_BIAS)));
+  
+    // Return the value if within bounds
+    return max(outsideBox3D(shadowTerms.xyz, ZERO_VEC.xyz, ONE_VEC.xyz), shadowValue);
+  #else
+    return 1.;
+  #endif
+}
+
+// Returns (integrated optical depth, integrated angstrom)
+float2 getBSMOpticalCoefficients(in float4 shadowTerms, in Texture2D<float4> BSMap, in SamplerState shadowSampler)
+{
+  float2 opticalValues = ZERO_VEC.xy;
+  
+  #if APPLY_BSM
+    // Sample (min-Z, Z-range, integrated density, integrated angstrom)
+    #if APPLY_UPSCALE
+      float4 beerSample = BSMap.SampleLevel(shadowSampler, shadowTerms.xy * .5, .5);
+    #else
+      float4 beerSample = BSMap.SampleLevel(shadowSampler, shadowTerms.xy, .5);
+    #endif
+    
+    // Determine the integrated optical depth + angstrom value along the incoming ray according to the BSM
+  
+    // Linearize the current z-depth
+    float linearValue = (shadowTerms.w - beerSample.r) / beerSample.g;
+    linearValue = saturate(linearValue);
+    
+    // Determine the Angstrom value (simple ratio of max)
+    opticalValues.y = linearValue * beerSample.a;
+    
+    // Improve the linear factor before determining optical depth
+    #if APPLY_IMPROVE_BSM
+      linearValue = smoothstep(.0, 1., linearValue);
+    #endif
+
+    // Determine optical depth
+    opticalValues.x = linearValue * beerSample.b;
+  
+    // Scale if it is outside the map
+    opticalValues *= insideBox3D(shadowTerms.xyz, float3(0.01, 0.01, .0), float3(.98, .98, 1.));
+  #endif
+  
+  return opticalValues;
+}
+
+// Returns the RGB values from CIEXYZ values (with two X wavelets)
+float3 spectralToRGB(in float4 xyzx, in float4x4 transform)
+{
+  #if APPLY_SPECTRAL
+    return mul(transform, xyzx).xyz;
+  #else
+  return mul(float4x4(
+    1., .0, .0, 1.,
+    .0, 1., .0, .0,
+    .0, .0, 1., .0,
+    .0, .0, .0, .0
+    ), xyzx).xyz;
+  #endif
 }
 
 #endif
