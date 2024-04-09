@@ -11,14 +11,6 @@ namespace Haboob
   {
     setupDefaults();
 
-    // Produce standalone shaders
-    deferredVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV", true);
-    deferredPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP", true);
-  }
-  HaboobWindow::~HaboobWindow()
-  {
-    delete deferredVertexShader;
-    delete deferredPixelShader;
   }
 
   void HaboobWindow::onStart()
@@ -47,13 +39,11 @@ namespace Haboob
     {
       auto dev = device.getDevice().Get();
       gbuffer.create(dev, requiredWidth, requiredHeight);
-      raymarchShader.createIntermediate(dev, requiredWidth, requiredHeight);
+      raymarchShader.createTextures(dev, requiredWidth, requiredHeight);
       light.create(dev, 1024, 1024);
 
       // Initialise all shaders
       {
-        deferredVertexShader->initShader(dev, &shaderManager);
-        deferredPixelShader->initShader(dev, &shaderManager);
         raymarchShader.initShader(dev, &shaderManager);
         haboobVolume.initShader(dev, &shaderManager);
         RenderTarget::copyShader.initShader(dev, &shaderManager);
@@ -85,25 +75,45 @@ namespace Haboob
         typedef MeshInstance<VertexType> Instance;
         
         Instance* instance = new Instance(&sphereMesh);
-        instance->getPosition() = { .0f, .0f, 2.5f };
+        instance->getPosition() = { .0f, .55f, 6.4f };
+        scene.addObject(instance);
+
+        instance = new Instance(&sphereMesh);
+        instance->getPosition() = { .4f, -.5f, .8f };
+        instance->getScale() = { .3f, .3f, .3f };
+        scene.addObject(instance);
+
+        instance = new Instance(&sphereMesh);
+        instance->getPosition() = { -.65f, .15f, 1.1f };
+        instance->getScale() = { .25f, .45f, .3f };
+        scene.addObject(instance);
+
+        instance = new Instance(&planeMesh);
+        instance->getRotation() = { .0f, .0f, .707f, .707f };
+        instance->getPosition() = { -1.f, 3.4f, 7.75f };
+        instance->getScale() = { 22.f, 22.f, 1.f };
         scene.addObject(instance);
 
         instance = new Instance(&planeMesh);
         instance->getRotation() = { .707f, .0f, .0f, .707f };
-        instance->getPosition() = { .0f, -1.f, .0f };
-        instance->getScale() = { 5.f, 5.f, 1.f };
+        instance->getPosition() = { .0f, -1.41f, .0f };
+        instance->getScale() = { 22.f, 22.f, 1.f };
         scene.addObject(instance);
 
         instance = new Instance(&cubeMesh);
-        instance->getPosition() = { -2.f, 1.5f, .0f };
+        instance->getPosition() = { -2.f, 1.5f, 2.f };
         scene.addObject(instance);
 
         // Haboob volume
         instance = new Instance(&sphereMesh);
-        instance->getPosition() = { .0f, .0f, .0f };
-        instance->getScale() = { 3.f, 3.f, 3.f };
+        instance->getRotation() = { .0f, .5f, .0f, .866f };
+        instance->getPosition() = { .0f, .4f, .65f };
+        instance->getScale() = { 4.f, 4.f, 4.f };
         scene.addObject(instance);
         raymarchShader.setBox(instance);
+
+        light.getForward() = {.0f, .0f, 1.f, 1.f};
+        light.getRenderPosition() = {.0f, .0f, .0f};
       }
     }
 
@@ -253,7 +263,13 @@ namespace Haboob
       shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
       shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
       shaderManager.setMacro("APPLY_UPSCALE", std::to_string(upscaleTracing));
+      shaderManager.setMacro("APPLY_BSM", std::to_string(useBSM));
+      shaderManager.setMacro("APPLY_IMPROVE_BSM", std::to_string(useImprovedBSM));
       shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
+      shaderManager.setMacro("APPLY_SHADOW", std::to_string(useShadows));
+      shaderManager.setMacro("TEXTURE_GRAPH", std::to_string(textureGraph));
+      shaderManager.setMacro("TEXTURE_NORMALS", std::to_string(textureNormals));
+      shaderManager.setMacro("TEXTURE_WHITE", std::to_string(textureWhite));
     }
 
     {
@@ -264,7 +280,8 @@ namespace Haboob
       shaderManager.setMacro("SHOW_RAY_TRAVEL", std::to_string(showRayTravel));
     }
 
-    shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(25.));
+    shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(15.));
+    shaderManager.setMacro("SHADOW_BIAS", std::to_string(.05));
 
     // If macros changed, recompile shaders!
     shaderManager.bakeMacros(device.getDevice().Get());
@@ -282,6 +299,10 @@ namespace Haboob
 
     raymarchShader.getBox()->setVisible(showBoundingBoxes);
     raymarchShader.setShouldUpscale(upscaleTracing);
+
+    raymarchShader.setCameraBuffer(scene.getCameraBuffer());
+    raymarchShader.setLightSource(&light);
+    raymarchShader.setTarget(&gbuffer.getLitColourTarget());
   }
 
   void HaboobWindow::createD3D()
@@ -298,7 +319,7 @@ namespace Haboob
   void HaboobWindow::adjustProjection()
   {
     gbuffer.resize(device.getDevice().Get(), requiredWidth, requiredHeight);
-    raymarchShader.resizeIntermediate(device.getDevice().Get(), requiredWidth, requiredHeight);
+    raymarchShader.resizeTextures(device.getDevice().Get(), requiredWidth, requiredHeight);
 
     // Setup the projection matrix.
     float fov = (float)XM_PIDIV4;
@@ -335,6 +356,7 @@ namespace Haboob
     device.setDepthEnabled(true);
     light.updateCameraView();
     light.rebuildLightBuffers(device.getContext().Get());
+    raymarchShader.updateSharedBuffers(device.getContext().Get());
     device.clearBackBuffer();
     gbuffer.clear(device.getContext().Get());
     gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
@@ -348,12 +370,23 @@ namespace Haboob
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // Shadowmap pass
-    light.rebuildLightBuffers(device.getContext().Get());
     light.setTarget(context);
     scene.setCamera(&light.getCamera());
     scene.draw(context, false);
 
+    // Generate the BSM
+    {
+      // Initial raymarch optimisation passes
+      raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&light.getRenderPosition()));
+
+      // Raymarch!
+      raymarchShader.bindSoftShadowMap(context, haboobVolume.getShaderView());
+      raymarchShader.render(context);
+      raymarchShader.unbindSoftShadowMap(context);
+    }
+
     // Full pass
+    raymarchShader.getBox()->setVisible(showBoundingBoxes);
     scene.setCamera(&mainCamera);
     scene.rebuildCameraBuffer(context);
     gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
@@ -373,22 +406,22 @@ namespace Haboob
 
     auto context = device.getContext().Get();
 
-    // Basic lit pass
-    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), light.getShadowSampler().Get());
-
-    // Initial raymarch optimisation passes
-    raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&mainCamera.getPosition()));
-
-    // Set up requirements for the proper pass
     scene.setCamera(&mainCamera);
-    raymarchShader.setCameraBuffer(scene.getCameraBuffer());
-    raymarchShader.setLightBuffer(light.getLightBuffer());
-    raymarchShader.setTarget(&gbuffer.getLitColourTarget());
 
-    // Raymarch!
-    raymarchShader.bindShader(context, haboobVolume.getShaderView());
-    raymarchShader.render(context);
-    raymarchShader.unbindShader(context);
+    // Basic lit pass
+    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), raymarchShader.getBSMResource(), light.getShadowSampler().Get(), raymarchShader.getMarchBuffer());
+
+    // Render the volume
+    {
+      // Initial raymarch optimisation passes
+      scene.setCamera(&mainCamera);
+      raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&mainCamera.getPosition()));
+
+      // Raymarch!
+      raymarchShader.bindShader(context, haboobVolume.getShaderView());
+      raymarchShader.render(context);
+      raymarchShader.unbindShader(context);
+    }
   }
 
   void HaboobWindow::renderMirror()
@@ -471,6 +504,8 @@ namespace Haboob
       ImGui::Text("FPS: %f", fps);
       ImGui::Text("Hello World");
 
+      ImGui::DragFloat3("Light Render Pos", &light.getRenderPosition().x, .1f);
+
       if (env)
       {
         env->getRoot().imguiGUIShow();
@@ -517,8 +552,11 @@ namespace Haboob
     XMStoreFloat3(&mainCamera.getPosition(), cameraPosition);
     mainCamera.setView(XMMatrixLookToLH(cameraPosition, cameraForward, up));
 
+    // Sometimes we want to slow down and focus on a part
+    float seekAngleCoefficient = (.1f + std::pow(std::cos(2.f * orbitProgress), 4.f));
+
     // Only progress w.r.t. delta if we are looking (otherwise a testing-stable environment is necessary)
-    orbitProgress += showWindow ? orbitStep * dtConsidered : orbitStep;
+    orbitProgress += showWindow ? orbitStep * dtConsidered * seekAngleCoefficient : orbitStep;
   }
 
   void HaboobWindow::setupDefaults()
@@ -540,8 +578,8 @@ namespace Haboob
 
     // Camera orbit (frame locked)
     cameraOrbit = false;
-    orbitLookAt = { 0, 0, 0 };
-    orbitAxis = { .0f, 1.f, 1.f };
+    orbitLookAt = { .0f, 0.1f, 0.2f };
+    orbitAxis = { .0f, 1.f, .2f };
     orbitRadius = 10.f;
     orbitStep = .011f;
     orbitProgress = .0f;
@@ -559,6 +597,12 @@ namespace Haboob
     showBoundingBoxes = false;
     showMasks = false;
     showRayTravel = false;
+    useBSM = true;
+    useImprovedBSM = true;
+    useShadows = true;
+    textureGraph = false;
+    textureNormals = false;
+    textureWhite = true;
 
     // Main rendering params
     mainRasterMode = DisplayDevice::RASTER_STATE_DEFAULT;
@@ -577,17 +621,17 @@ namespace Haboob
       auto& opticsInfo = raymarchShader.getOpticsInfo();
 
       opticsInfo.anisotropicForwardTerms = { .735f, .732f, .651f, .735f };
-      opticsInfo.anisotropicBackwardTerms = { -.735f, -.732f, -.651f, -.735f };
-      opticsInfo.phaseBlendWeightTerms = { .2f, .2f, .2f, .2f, };
-      opticsInfo.scatterAngstromExponent = 9.1f;
+      opticsInfo.anisotropicBackwardTerms = { -.6f, -.732f, -.651f, -.735f };
+      opticsInfo.phaseBlendWeightTerms = { .17f, .11f, .2f, .2f, };
+      opticsInfo.scatterAngstromExponent = 2.1f;
 
-      opticsInfo.ambientFraction = { .8f, .8f, .8f, .8f, };
-      opticsInfo.absorptionAngstromExponent = 34.1f;
+      opticsInfo.ambientFraction = { .2f, .2f, .2f, .2f, };
+      opticsInfo.absorptionAngstromExponent = 2.3f;
       opticsInfo.powderCoefficient = .035f;
-      opticsInfo.attenuationFactor = 24.f;
+      opticsInfo.attenuationFactor = 14.1f;
     }
 
-    raymarchShader.getMarchInfo().iterations = 26;
+    raymarchShader.getMarchInfo().iterations = 52;
   }
 
   void HaboobWindow::setupEnv(Environment* environment)
@@ -738,6 +782,18 @@ namespace Haboob
         new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "ShowRayTravel", "If the renderer should display the distance rays have travelled", { "srt" }),
         &showRayTravel))
         ->setName("Show Ray Travel"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "TextureGrid", "If the renderer should display grid textures", { "tg" }),
+        &textureGraph))
+        ->setName("Texture Grid"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "TextureNorm", "If the renderer should display normal textures", { "tn" }),
+        &textureNormals))
+        ->setName("Texture Norms"));
+      renderToggleGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*renderToggleGroup->getArgGroup(), "TextureWhite", "If the renderer should display white textures", { "tw" }),
+        &textureWhite))
+        ->setName("Texture White"));
     }
 
     {
@@ -796,7 +852,7 @@ namespace Haboob
 
       haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.wackyPower))
         ->setName("Haboob Wacky Power (tm)")
-        ->setGUISettings(1.f, .0f, 10.f));
+        ->setGUISettings(.05f, .0f, 10.f));
       haboobGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &volumeInfo.wackyScale))
         ->setName("Haboob Wacky Scale (tm)")
         ->setGUISettings(1.f, .0f, 10.f));
@@ -892,6 +948,9 @@ namespace Haboob
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.scatterAngstromExponent))
         ->setName("Scattering angstrom exponent")
         ->setGUISettings(1.f, .0f, 100.f));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.referenceWavelength))
+        ->setName("Reference wavelength")
+        ->setGUISettings(.001f, .0f, 1.f));
 
       // Transmission
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &opticsInfo.absorptionAngstromExponent))
@@ -921,6 +980,18 @@ namespace Haboob
         new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyConeTrace", "If cone tracing should be used for anti-aliasing", { "uct" }), 
         &coneTrace))
         ->setName("Apply Cone Tracing"));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyBSM", "If the beer shadow map should be used as part of lighting", { "ubsm" }),
+        &useBSM))
+        ->setName("Apply BSM"));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyImprovedBSM", "If the better beer shadow map model should be used as part of lighting", { "uibsm" }),
+        &useImprovedBSM))
+        ->setName("Apply Improved BSM"));
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyShadows", "If shadowing should be used as part of lighting", { "usm" }),
+        &useShadows))
+        ->setName("Apply Shadows"));
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool,
         new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplyUpscaleTrace", "If upscaling should be used for raymarching", { "uqt" }),
         &upscaleTracing))

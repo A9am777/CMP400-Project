@@ -4,6 +4,7 @@
 #include "Rendering/Geometry/MeshRenderer.h"
 #include <Rendering/Textures/GBuffer.h>
 #include <Rendering/Scene/Camera.h>
+#include <Rendering/Lighting/LightSource.h>
 
 namespace Haboob
 {
@@ -36,12 +37,13 @@ namespace Haboob
     float powderCoefficient; // Beers-Powder scaling factor
     XMFLOAT4X4 spectralWavelengths; // Wavelengths to integrate over
     XMFLOAT4X4 spectralWeights; // Spectral integration weights
+    XMFLOAT4X4 spectralToRGB; // CIEXYZ to linear RGB
 
     XMFLOAT4 ambientFraction;
+    float referenceWavelength = 0.843f; // The wavelength which the Angstrom exponent is in relation to
     UINT flagApplyBeer = 1; // Controls whether to apply Beer-Lambert attenuation
     UINT flagApplyHG = 1; // Controls whether to apply the HG phase function
     UINT flagApplySpectral = 1; // Controls whether to integrate over several wavelengths
-    UINT flagUnused = 1;
   };
 
   struct ComprehensiveBufferInfo
@@ -56,23 +58,23 @@ namespace Haboob
     public:
     struct HaboobRadial
     {
-      float roofGradient = -3.87f;
-      float exponentialRate = 20.f;
+      float roofGradient = -3.58f;
+      float exponentialRate = 8.36f;
       float exponentialScale = .22f;
-      float rOffset = .0f;
-      float noseHeight = .34f;
-      float blendHeight = .22f;
-      float blendRate = .25f;
+      float rOffset = .36f;
+      float noseHeight = .19f;
+      float blendHeight = .87f;
+      float blendRate = 1.45f;
       float padding = .0f;
     };
 
     struct HaboobDistribution
     {
-      float falloffScale = .4f;
-      float heightScale = 1.3f;
-      float heightExponent = .2f;
-      float angleRange = 4.2f;
-      float anglePower = 3.f;
+      float falloffScale = .22f;
+      float heightScale = 5.52f;
+      float heightExponent = .74f;
+      float angleRange = 4.33f;
+      float anglePower = 3.26f;
       XMFLOAT3 padding;
     };
 
@@ -91,8 +93,8 @@ namespace Haboob
 
       float fbmOffset = .1f;
       float fbmScale = .4f;
-      float wackyPower = .8f;
-      float wackyScale = .6f;
+      float wackyPower = .32f;
+      float wackyScale = .31f;
 
       HaboobRadial radial;
       HaboobDistribution distribution;
@@ -130,9 +132,12 @@ namespace Haboob
     RaymarchVolumeShader();
     ~RaymarchVolumeShader();
 
+
     HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource);
     void unbindShader(ID3D11DeviceContext* context);
+
+    void updateSharedBuffers(ID3D11DeviceContext* context);
 
     // Mirror from the intermediate to the target buffer
     void mirror(ID3D11DeviceContext* context);
@@ -140,20 +145,27 @@ namespace Haboob
     // TODO: TEMP
     void optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer, XMVECTOR& cameraPosition);
 
-    HRESULT createIntermediate(ID3D11Device* device, UInt width, UInt height);
-    HRESULT resizeIntermediate(ID3D11Device* device, UInt width, UInt height);
+    // Renders the Beer Shadow Map
+    void bindSoftShadowMap(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource);
+    void generateSoftShadowMap(ID3D11DeviceContext* context) const;
+    void unbindSoftShadowMap(ID3D11DeviceContext* context);
+
+    HRESULT createTextures(ID3D11Device* device, UInt width, UInt height);
+    HRESULT resizeTextures(ID3D11Device* device, UInt width, UInt height);
 
     void render(ID3D11DeviceContext* context) const;
 
     inline void setTarget(RenderTarget* target) { renderTarget = target; }
     inline void setCameraBuffer(ComPtr<ID3D11Buffer> buffer) { cameraBuffer = buffer; }
-    inline void setLightBuffer(ComPtr<ID3D11Buffer> buffer) { lightBuffer = buffer; }
+    inline void setLightSource(Light* lightSource) { mainLight = lightSource; }
     inline void setBox(MeshInstance<VertexType>* boxInstance) { boundingBox = boxInstance; }
     inline void setShouldUpscale(bool upscale) { shouldUpscale = upscale; }
 
     inline MeshInstance<VertexType>* getBox() { return boundingBox; }
     inline MarchVolumeDispatchInfo& getMarchInfo() { return marchInfo; }
     inline BasicOptics& getOpticsInfo() { return opticsInfo; }
+    inline ID3D11ShaderResourceView* getBSMResource() { return bsmTarget.getShaderView(); }
+    inline ID3D11Buffer* getMarchBuffer() { return marchBuffer.Get(); }
 
     void buildSpectralMatrices();
 
@@ -162,7 +174,8 @@ namespace Haboob
 
     // Optimisations
     MeshInstance* boundingBox;
-    ComPtr<ID3D11BlendState> additiveBlend;
+    ComPtr<ID3D11BlendState> frontRayBlend;
+    ComPtr<ID3D11BlendState> backRayBlend;
     ComPtr<ID3D11SamplerState> pixelSamplerState;
     Shader* frontRayVisibilityPixelShader;
     Shader* backRayVisibilityPixelShader;
@@ -170,7 +183,9 @@ namespace Haboob
 
     // Intermediates
     RenderTarget rayTarget; // Used to store ray information between stages
+    RenderTarget bsmTarget; // Used to store ray information between stages
     Shader* mirrorComputeShader;
+    Shader* bsmComputeShader;
 
     // Main
     Shader* computeShader;
@@ -182,7 +197,7 @@ namespace Haboob
     ComPtr<ID3D11SamplerState> marchSamplerState;
     ComPtr<ID3D11Buffer> marchBuffer;
     ComPtr<ID3D11Buffer> cameraBuffer;
-    ComPtr<ID3D11Buffer> lightBuffer;
+    Light* mainLight;
 
     // Coefficients of CIE functions in order {scale, exponentScale, wavelengthScale, wavelengthOffset}
     float redMinorCIECoefficients[4] = { 0.39800f, 35.35534f, 0.78895f, 0.56223f };

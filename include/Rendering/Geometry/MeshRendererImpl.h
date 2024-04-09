@@ -25,7 +25,7 @@ namespace Haboob
   inline MeshRenderer<VertexT>::MeshRenderer()
   {
     deferredVertexShader = new Shader(Shader::Type::Vertex, L"Raster/DeferredMeshShaderV", true);
-    deferredPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP", true);
+    deferredPixelShader = new Shader(Shader::Type::Pixel, L"Raster/DeferredMeshShaderP");
     useDeferredContext = true;
   }
 

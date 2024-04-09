@@ -31,7 +31,6 @@ namespace Haboob
 
     public:
     HaboobWindow();
-    ~HaboobWindow();
     
     void setupEnv(Environment* environment);
 
@@ -112,6 +111,12 @@ namespace Haboob
     bool showBoundingBoxes;
     bool showMasks;
     bool showRayTravel;
+    bool useBSM;
+    bool useImprovedBSM;
+    bool useShadows;
+    bool textureGraph;
+    bool textureNormals;
+    bool textureWhite;
 
     // Rendering device
     DisplayDevice device;
@@ -130,9 +135,6 @@ namespace Haboob
     Scene scene;
     Light light;
     FreeCam mainCamera;
-    
-    Shader* deferredVertexShader;
-    Shader* deferredPixelShader;
 
     // Main rendering environment
     GBuffer gbuffer;

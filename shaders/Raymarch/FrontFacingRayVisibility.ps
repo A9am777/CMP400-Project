@@ -10,14 +10,13 @@ struct InputType
   float3 worldPosition : POSITION1;
 };
 
-// This shader masks the frontface of a bounding box (via occlusion) and additively blends the determined depth
+// This shader masks the frontface of a bounding box (via occlusion) and additively 'appends' the determined depth
 float4 main(InputType input) : SV_Target
 {
-  // Additive, combat initial undefined -ve value
-  float4 output = float4(1., .0, .0, 1.);
+  float4 output = float4(1., -1., -1., -1.);
   
   // The bound depth. Note that a camera *within* the bounds should exhibit different behaviour
-  output.x += input.screenPosition.z;
+  output.r = input.position.z;
   
   return output;
 }

@@ -10,6 +10,7 @@ namespace Haboob
   RaymarchVolumeShader::RaymarchVolumeShader()
   {
     computeShader = new Shader(Shader::Type::Compute, L"Raymarch/MarchVolume");
+    bsmComputeShader = new Shader(Shader::Type::Compute, L"Raymarch/BeerShadowMarchVolume");
     mirrorComputeShader = new Shader(Shader::Type::Compute, L"Raymarch/MirrorMarchTexture");
     frontRayVisibilityPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/FrontFacingRayVisibility");
     backRayVisibilityPixelShader = new Shader(Shader::Type::Pixel, L"Raymarch/BackFacingRayVisibility");
@@ -23,6 +24,7 @@ namespace Haboob
   RaymarchVolumeShader::~RaymarchVolumeShader()
   {
     delete computeShader; computeShader = nullptr;
+    delete bsmComputeShader; bsmComputeShader = nullptr;
     delete mirrorComputeShader; mirrorComputeShader = nullptr;
     delete frontRayVisibilityPixelShader; frontRayVisibilityPixelShader = nullptr;
     delete backRayVisibilityPixelShader; backRayVisibilityPixelShader = nullptr;
@@ -33,6 +35,8 @@ namespace Haboob
     HRESULT result = S_OK;
 
     result = computeShader->initShader(device, manager);
+    Firebreak(result);
+    bsmComputeShader->initShader(device, manager);
     Firebreak(result);
     result = mirrorComputeShader->initShader(device, manager);
     Firebreak(result);
@@ -92,26 +96,53 @@ namespace Haboob
       Firebreak(result);
     }
 
-    // Create the additive blend state (for ray cull optimisations)
+    // Create the masking blend state (for ray cull optimisations)
     {
       D3D11_BLEND_DESC blendDesc;
-      for (auto i = 0; i < 8; ++i)
+      blendDesc.AlphaToCoverageEnable = false;
+      blendDesc.IndependentBlendEnable = false;
+
+      auto& renderTargetBlend = blendDesc.RenderTarget[0];
       {
-        blendDesc.RenderTarget[i] = D3D11_RENDER_TARGET_BLEND_DESC();
-        blendDesc.RenderTarget[i].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-        blendDesc.RenderTarget[i].BlendEnable = true;
-        blendDesc.RenderTarget[i].BlendOp = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[i].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[i].SrcBlend = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].DestBlend = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].SrcBlendAlpha = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[i].DestBlendAlpha = D3D11_BLEND_ZERO;
+        renderTargetBlend = D3D11_RENDER_TARGET_BLEND_DESC();
+        renderTargetBlend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_ALPHA;
+        renderTargetBlend.BlendEnable = true;
+        renderTargetBlend.BlendOp = D3D11_BLEND_OP_ADD;
+        renderTargetBlend.BlendOpAlpha = D3D11_BLEND_OP_ADD;
+        renderTargetBlend.SrcBlend = D3D11_BLEND_ONE;
+        renderTargetBlend.DestBlend = D3D11_BLEND_ZERO;
+        renderTargetBlend.SrcBlendAlpha = D3D11_BLEND_ONE;
+        renderTargetBlend.DestBlendAlpha = D3D11_BLEND_ZERO;
       }
-      result = device->CreateBlendState(&blendDesc, additiveBlend.ReleaseAndGetAddressOf());
+      result = device->CreateBlendState(&blendDesc, frontRayBlend.ReleaseAndGetAddressOf());
+      Firebreak(result);
+
+      renderTargetBlend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL & ~D3D11_COLOR_WRITE_ENABLE_RED;
+
+      result = device->CreateBlendState(&blendDesc, backRayBlend.ReleaseAndGetAddressOf());
       Firebreak(result);
     }
 
     return result;
+  }
+
+  void RaymarchVolumeShader::updateSharedBuffers(ID3D11DeviceContext* context)
+  {
+    marchInfo.outputHorizontalStep = 1.f / float(rayTarget.getWidth());
+    marchInfo.outputVerticalStep = 1.f / float(rayTarget.getHeight());
+    boundingBox->buildTransform();
+    marchInfo.localVolumeTransform = XMMatrixInverse(nullptr, boundingBox->getTransform());
+    marchInfo.volumeSize = boundingBox->getScale();
+
+    // Update the march buffer
+    {
+      D3D11_MAPPED_SUBRESOURCE mapped;
+      HRESULT result = context->Map(marchBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+      ComprehensiveBufferInfo* mappedBuffer = (ComprehensiveBufferInfo*)mapped.pData;
+      std::memcpy(&mappedBuffer->marchVolumeInfo, &marchInfo, sizeof(MarchVolumeDispatchInfo));
+      std::memcpy(&mappedBuffer->opticalInfo, &opticsInfo, sizeof(BasicOptics));
+      context->Unmap(marchBuffer.Get(), 0);
+    }
   }
 
   void RaymarchVolumeShader::bindShader(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource)
@@ -120,44 +151,31 @@ namespace Haboob
     ID3D11UnorderedAccessView* accessView = rayTarget.getComputeView();
     context->CSSetUnorderedAccessViews(0, 1, &accessView, 0);
     context->CSSetConstantBuffers(0, 1, cameraBuffer.GetAddressOf());
-    // Update and mirror march data
-    {
-      marchInfo.outputHorizontalStep = 1.f / float(rayTarget.getWidth());
-      marchInfo.outputVerticalStep = 1.f / float(rayTarget.getHeight());
-      boundingBox->buildTransform();
-      marchInfo.localVolumeTransform = XMMatrixInverse(nullptr, boundingBox->getTransform());
-      marchInfo.volumeSize = boundingBox->getScale();
-
-      D3D11_MAPPED_SUBRESOURCE mapped;
-      HRESULT result = context->Map(marchBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-      ComprehensiveBufferInfo* mappedBuffer = (ComprehensiveBufferInfo*)mapped.pData;
-      std::memcpy(&mappedBuffer->marchVolumeInfo, &marchInfo, sizeof(MarchVolumeDispatchInfo));
-      std::memcpy(&mappedBuffer->opticalInfo, &opticsInfo, sizeof(BasicOptics));
-      context->Unmap(marchBuffer.Get(), 0);
-    }
 
     context->CSSetConstantBuffers(1, 1, marchBuffer.GetAddressOf());
-    context->CSSetConstantBuffers(2, 1, lightBuffer.GetAddressOf());
+    context->CSSetConstantBuffers(2, 1, mainLight->getLightBuffer().GetAddressOf());
+    context->CSSetConstantBuffers(3, 1, mainLight->getLightPerspectiveBuffer().GetAddressOf());
 
     context->CSSetSamplers(0, 1, marchSamplerState.GetAddressOf());
     context->CSSetShaderResources(0, 1, &densityTexResource);
 
-    context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
+    context->CSSetSamplers(1, 1, mainLight->getShadowSampler().GetAddressOf());
+    auto shadowTextureView = mainLight->getShaderView();
+    context->CSSetShaderResources(1, 1, &shadowTextureView);
+
+    auto bsmTextureView = bsmTarget.getShaderView();
+    context->CSSetShaderResources(2, 1, &bsmTextureView);
   }
 
   void RaymarchVolumeShader::unbindShader(ID3D11DeviceContext* context)
   {
     computeShader->unbindShader(context);
 
-    void* nullpo = nullptr;
+    void* nullpo[4] = { nullptr, nullptr, nullptr, nullptr };
     context->CSSetUnorderedAccessViews(0, 1, (ID3D11UnorderedAccessView**)&nullpo, 0);
-    context->CSSetConstantBuffers(0, 1, (ID3D11Buffer**)&nullpo);
-    context->CSSetConstantBuffers(1, 1, (ID3D11Buffer**)&nullpo);
-    context->CSSetConstantBuffers(2, 1, (ID3D11Buffer**)&nullpo);
-    context->CSSetSamplers(0, 1, (ID3D11SamplerState**)&nullpo);
-    context->CSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
-
-    context->OMSetBlendState(nullptr, nullptr, ~0);
+    context->CSSetConstantBuffers(0, 4, (ID3D11Buffer**)&nullpo);
+    context->CSSetSamplers(0, 2, (ID3D11SamplerState**)&nullpo);
+    context->CSSetShaderResources(0, 3, (ID3D11ShaderResourceView**)&nullpo);
   }
 
   void RaymarchVolumeShader::mirror(ID3D11DeviceContext* context)
@@ -172,6 +190,7 @@ namespace Haboob
     ID3D11SamplerState* sampler = copyShader.getSampler().Get();
     context->CSSetSamplers(0, 1, &sampler);
 
+    // TODO
     ID3D11ShaderResourceView* rayResourceTexture = rayTarget.getShaderView();
     context->CSSetShaderResources(0, 1, &rayResourceTexture);
 
@@ -203,12 +222,13 @@ namespace Haboob
     }
 
     // -ve values signal "not visible" or "fragment component not updated"
-    float rayClearColour[4] = { cameraWithin ? .001f : -1.f, -1.f, .0f, 1.f };
+    float rayClearColour[4] = { cameraWithin ? .0f : -1.f, -1.f, .0f, 1.f };
     rayTarget.clear(context, rayClearColour);
     rayTarget.setTarget(context, device.getDepthBuffer());
-    context->OMSetBlendState(additiveBlend.Get(), nullptr, ~0);
+    context->OMSetBlendState(frontRayBlend.Get(), nullptr, ~0);
 
     boundingBox->setVisible(true);
+    device.setDepthEnabled(true, false);
 
     if (!cameraWithin)
     {
@@ -222,10 +242,12 @@ namespace Haboob
       // Prepare to roll back to the previous raster state
       auto previousRasterState = device.getRasterState();
       
+      context->OMSetBlendState(backRayBlend.Get(), nullptr, ~0);
+
       // Cull front face and render the backface as a 'mask'
       device.setCullBackface(false); 
       device.setCull(true);
-      device.setDepthEnabled(false);
+      device.setDepthEnabled(false, false);
 
       // Need to read the depth so either the bounds max or depth is rendered!
       ID3D11ShaderResourceView* textureView = gbuffer.getNormalDepthTarget().getShaderView();
@@ -245,11 +267,12 @@ namespace Haboob
 
     renderer.unbind(context);
 
+    boundingBox->setVisible(false);
     context->OMSetBlendState(nullptr, nullptr, ~0);
     device.setBackBufferTarget();
   }
 
-  HRESULT RaymarchVolumeShader::createIntermediate(ID3D11Device* device, UInt width, UInt height)
+  HRESULT RaymarchVolumeShader::createTextures(ID3D11Device* device, UInt width, UInt height)
   {
     // Currently no need to use custom texture descriptions
     HRESULT result = S_OK;
@@ -257,10 +280,13 @@ namespace Haboob
     result = rayTarget.create(device, width, height);
     Firebreak(result);
 
+    result = bsmTarget.create(device, width, height);
+    Firebreak(result);
+
     return result;
   }
 
-  HRESULT RaymarchVolumeShader::resizeIntermediate(ID3D11Device* device, UInt width, UInt height)
+  HRESULT RaymarchVolumeShader::resizeTextures(ID3D11Device* device, UInt width, UInt height)
   {
     // Currently no need to use custom texture descriptions
     HRESULT result = S_OK;
@@ -268,7 +294,45 @@ namespace Haboob
     result = rayTarget.resize(device, width, height);
     Firebreak(result);
 
+    result = bsmTarget.resize(device, width, height);
+    Firebreak(result);
+
     return result;
+  }
+
+  void RaymarchVolumeShader::bindSoftShadowMap(ID3D11DeviceContext* context, ID3D11ShaderResourceView* densityTexResource)
+  {
+    bsmComputeShader->bindShader(context);
+    ID3D11UnorderedAccessView* accessViews[2] = { rayTarget.getComputeView(), bsmTarget.getComputeView() };
+    context->CSSetUnorderedAccessViews(0, 2, accessViews, 0);
+    context->CSSetConstantBuffers(0, 1, mainLight->getLightPerspectiveBuffer().GetAddressOf());
+
+    context->CSSetConstantBuffers(1, 1, marchBuffer.GetAddressOf());
+    context->CSSetConstantBuffers(2, 1, mainLight->getLightBuffer().GetAddressOf());
+
+    context->CSSetSamplers(0, 1, marchSamplerState.GetAddressOf());
+    context->CSSetShaderResources(0, 1, &densityTexResource);
+  }
+
+  void RaymarchVolumeShader::unbindSoftShadowMap(ID3D11DeviceContext* context)
+  {
+    computeShader->unbindShader(context);
+
+    void* nullpo[3] = { nullptr, nullptr, nullptr };
+    context->CSSetUnorderedAccessViews(0, 2, (ID3D11UnorderedAccessView**)nullpo, 0);
+    context->CSSetConstantBuffers(0, 3, (ID3D11Buffer**)&nullpo);
+    context->CSSetSamplers(0, 1, (ID3D11SamplerState**)&nullpo);
+    context->CSSetShaderResources(0, 1, (ID3D11ShaderResourceView**)&nullpo);
+  }
+
+  void RaymarchVolumeShader::generateSoftShadowMap(ID3D11DeviceContext* context) const
+  {
+    static constexpr UInt groupSize = 16;
+
+    // Render with a quarter of rays if upscaling
+    XMUINT2 rayCount = shouldUpscale ? XMUINT2(bsmTarget.getWidth() >> 1, bsmTarget.getHeight() >> 1) : XMUINT2(bsmTarget.getWidth(), bsmTarget.getHeight());
+    // Divide rays into groups plus an extra padding group
+    bsmComputeShader->dispatch(context, 1 + rayCount.x / groupSize, 1 + rayCount.y / groupSize);
   }
 
   void RaymarchVolumeShader::render(ID3D11DeviceContext* context) const
@@ -321,16 +385,25 @@ namespace Haboob
       {
         if (wavelet == 1) // Green = linear
         {
-          optics.spectralWeights.m[term][wavelet] = hermitGaussWeights[term] * linearWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
-          optics.spectralWavelengths.m[term][wavelet] = linearAbscissasAdjust(hermitGaussAbscissas[term], distribution);
+          optics.spectralWeights.m[wavelet][term] = hermitGaussWeights[term] * linearWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
+          optics.spectralWavelengths.m[wavelet][term] = linearAbscissasAdjust(hermitGaussAbscissas[term], distribution);
         }
         else // Everything else = logarithmic
         {
-          optics.spectralWeights.m[term][wavelet] = hermitGaussWeights[term] * logWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
-          optics.spectralWavelengths.m[term][wavelet] = logAbscissasAdjust(hermitGaussAbscissas[term], distribution);
+          optics.spectralWeights.m[wavelet][term] = hermitGaussWeights[term] * logWeight(hermitGaussAbscissas[term], distribution) * distribution[0];
+          optics.spectralWavelengths.m[wavelet][term] = logAbscissasAdjust(hermitGaussAbscissas[term], distribution);
         }
       }
     }
+
+    // This matrix transforms from the CIEXYZ components to display independent linear RGB (note: column1 = column4)
+    XMMATRIX spectralToRGB = XMMatrixSet(
+      3.2406, -1.5372, -.4986, 3.2406,
+      -.9689, 1.8758, .0415, -.9689,
+      .0557, -.2040, 1.0570, .0557,
+      .0, .0, .0, .0);
+    spectralToRGB = XMMatrixTranspose(spectralToRGB);
+    XMStoreFloat4x4(&optics.spectralToRGB, spectralToRGB);
   }
 
   VolumeGenerationShader::VolumeGenerationShader()

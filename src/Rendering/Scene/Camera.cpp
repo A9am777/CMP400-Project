@@ -32,7 +32,7 @@ namespace Haboob
 
   void Camera::recomputeInverseViewProjection()
   {
-    // TODO: view matrix inverse can be computed quickly
+    // Regular view matrix inverse can be computed quickly, however that is not a concern here
     transformations.inverseViewProjectionMatrix = XMMatrixInverse(nullptr, transformations.viewMatrix * transformations.projectionMatrix);
   }
 }

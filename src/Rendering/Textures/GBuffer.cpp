@@ -66,14 +66,15 @@ namespace Haboob
     return result;
   }
 
-  void GBuffer::lightPass(ID3D11DeviceContext* context, ID3D11Buffer* lightbuffer, ID3D11Buffer* lightCameraBuffer, ID3D11ShaderResourceView* lightShadowMap, ID3D11SamplerState* shadowSampler)
+  void GBuffer::lightPass(ID3D11DeviceContext* context, ID3D11Buffer* lightbuffer, ID3D11Buffer* lightCameraBuffer, ID3D11ShaderResourceView* lightShadowMap, ID3D11ShaderResourceView* beerShadowMap, ID3D11SamplerState* shadowSampler, ID3D11Buffer* marchBuffer)
   {
-    ID3D11ShaderResourceView* textureResources[4] = { diffuseTarget.getShaderView(), normalDepthTarget.getShaderView(), worldPositionTarget.getShaderView(), lightShadowMap};
+    ID3D11ShaderResourceView* textureResources[5] = { diffuseTarget.getShaderView(), normalDepthTarget.getShaderView(), worldPositionTarget.getShaderView(), lightShadowMap, beerShadowMap};
     ID3D11UnorderedAccessView* outTarget = litColourTarget.getComputeView();
     
     context->CSSetSamplers(0, 1, &shadowSampler);
-    context->CSSetShaderResources(0, 4, textureResources);
+    context->CSSetShaderResources(0, 5, textureResources);
     context->CSSetUnorderedAccessViews(0, 1, &outTarget, nullptr);
+    context->CSSetConstantBuffers(2, 1, &marchBuffer);
     lightShader.bindShader(context, lightbuffer, lightCameraBuffer);
       Shader::dispatch(context, 1 + litColourTarget.getWidth() / 8, 1 + litColourTarget.getHeight() / 8);
     lightShader.unbindShader(context);
@@ -81,9 +82,11 @@ namespace Haboob
     std::memset(textureResources, 0, sizeof(textureResources));
     outTarget = nullptr;
     shadowSampler = nullptr;
+    marchBuffer = nullptr;
     context->CSSetSamplers(0, 1, &shadowSampler);
-    context->CSSetShaderResources(0, 4, textureResources);
+    context->CSSetShaderResources(0, 5, textureResources);
     context->CSSetUnorderedAccessViews(0, 1, &outTarget, nullptr);
+    context->CSSetConstantBuffers(2, 1, &marchBuffer);
   }
 
   void GBuffer::finalLitPass(ID3D11DeviceContext* context)
