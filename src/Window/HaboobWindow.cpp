@@ -573,8 +573,8 @@ namespace Haboob
 
     // Controls
     mainCamera.getMoveRate() = 6.f;
-    mainCamera.getPosition() = { -8.42f, .93f, -1.41f };
-    mainCamera.getAngles() = { 1.36f, .1f, .0f };
+    mainCamera.getPosition() = { -.135f, -.475f, 6.345f };
+    mainCamera.getAngles() = { XM_PI, .0f, .0f };
 
     // Camera orbit (frame locked)
     cameraOrbit = false;

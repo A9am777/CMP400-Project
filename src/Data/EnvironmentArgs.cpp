@@ -95,14 +95,32 @@ namespace Haboob
       case Type::Float:
         *(float*)destination = ((args::ValueFlag<float>*)variableHook)->Get();
         break;
-      //case Type::Float2:
-
+      case Type::Float2:
+      {
+        auto& list = ((args::ValueFlagList<float>*)variableHook)->Get();
+        if (list.size() >= 2)
+        {
+          std::memcpy(destination, list.data(), sizeof(float) * 2);
+        }
+      }
         break;
-      //case Type::Float3:
-
+      case Type::Float3:
+      {
+        auto& list = ((args::ValueFlagList<float>*)variableHook)->Get();
+        if (list.size() >= 3)
+        {
+          std::memcpy(destination, list.data(), sizeof(float) * 3);
+        }
+      }
         break;
-      //case Type::Float4:
-
+      case Type::Float4:
+      {
+        auto& list = ((args::ValueFlagList<float>*)variableHook)->Get();
+        if (list.size() >= 4)
+        {
+          std::memcpy(destination, list.data(), sizeof(float) * 4);
+        }
+      }
         break;
       case Type::Flags:
         *(UInt*)destination = ((args::ValueFlag<UInt>*)variableHook)->Get() ? BitSet(*(UInt*)destination, *(UInt*)guiSetting1) : BitClear(*(UInt*)destination, *(UInt*)guiSetting1);
@@ -110,17 +128,41 @@ namespace Haboob
       case Type::Int:
         *(int*)destination = ((args::ValueFlag<int>*)variableHook)->Get();
         break;
-      //case Type::Int2:
-
+      case Type::Int2:
+      {
+        auto& list = ((args::ValueFlagList<int>*)variableHook)->Get();
+        if (list.size() >= 2)
+        {
+          std::memcpy(destination, list.data(), sizeof(int) * 2);
+        }
+      }
         break;
-      //case Type::Int3:
-
+      case Type::Int3:
+      {
+        auto& list = ((args::ValueFlagList<int>*)variableHook)->Get();
+        if (list.size() >= 3)
+        {
+          std::memcpy(destination, list.data(), sizeof(int) * 3);
+        }
+      }
         break;
-      //case Type::Int4:
-
+      case Type::Int4:
+      {
+        auto& list = ((args::ValueFlagList<int>*)variableHook)->Get();
+        if (list.size() >= 4)
+        {
+          std::memcpy(destination, list.data(), sizeof(int) * 4);
+        }
+      }
         break;
-      //case Type::UInt4:
-
+      case Type::UInt4:
+      {
+        auto& list = ((args::ValueFlagList<UInt>*)variableHook)->Get();
+        if (list.size() >= 2)
+        {
+          std::memcpy(destination, list.data(), sizeof(UInt) * 2);
+        }
+      }
         break;
     }
   }
