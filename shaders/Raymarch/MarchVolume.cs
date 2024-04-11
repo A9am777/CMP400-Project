@@ -199,9 +199,11 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Directional lighting will have a constant phase along the ray
   float angularDistance = dot(ray.dir.xyz, -light.direction.xyz);
-  float4 incomingForwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicForwardTerms) * float4(light.diffuse, light.diffuse.r);
-  float4 incomingBackwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicBackwardTerms) * float4(light.diffuse, light.diffuse.r);
-  float4 ambientIrradiance = opticalInfo.ambientFraction * float4(light.ambient, light.ambient.r) * Phase(1., opticalInfo.anisotropicForwardTerms);
+  float4 ambientIrradiance = float4(light.diffuse, light.diffuse.r);
+  float4 incomingForwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicForwardTerms) * ambientIrradiance;
+  float4 incomingBackwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicBackwardTerms) * ambientIrradiance;
+  float4 incomingIrradianceBlend = lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms);
+  ambientIrradiance *= float4(light.ambient, light.ambient.r) * opticalInfo.ambientFraction;
   
   // Integrated optical depth and angstrom
   Integrator absorptionInte = { 0, 0, 0, 0, 0 };
@@ -250,7 +252,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     
     // Accumulate intensity as a function of optical thickness
     {
-      float4 directIrradiance = ambientIrradiance + shadowValue * lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms);
+      float4 directIrradiance = ambientIrradiance + shadowValue * incomingIrradianceBlend;
       #if APPLY_SPECTRAL
         // Cache the wavelength matrix
         float4x4 wavelengths = getSpectralWavelengths(opticalInfo);

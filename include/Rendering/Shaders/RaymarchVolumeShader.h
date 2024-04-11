@@ -142,7 +142,6 @@ namespace Haboob
     // Mirror from the intermediate to the target buffer
     void mirror(ID3D11DeviceContext* context);
 
-    // TODO: TEMP
     void optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer, XMVECTOR& cameraPosition);
 
     // Renders the Beer Shadow Map

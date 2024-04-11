@@ -1,5 +1,7 @@
 #include "Rendering/Shaders/ShaderManager.h"
+#include "Rendering/Geometry/MeshRendererImpl.h"
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
+
 #include <cmath>
 
 #undef min

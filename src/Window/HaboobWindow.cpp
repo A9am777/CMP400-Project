@@ -625,10 +625,10 @@ namespace Haboob
       opticsInfo.phaseBlendWeightTerms = { .17f, .11f, .2f, .2f, };
       opticsInfo.scatterAngstromExponent = 2.1f;
 
-      opticsInfo.ambientFraction = { .2f, .2f, .2f, .2f, };
+      opticsInfo.ambientFraction = { .8f, 1.f, 1.f, 1.f, };
       opticsInfo.absorptionAngstromExponent = 2.3f;
       opticsInfo.powderCoefficient = .035f;
-      opticsInfo.attenuationFactor = 14.1f;
+      opticsInfo.attenuationFactor = 16.1f;
     }
 
     raymarchShader.getMarchInfo().iterations = 52;
