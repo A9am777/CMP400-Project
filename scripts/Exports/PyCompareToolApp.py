@@ -23,4 +23,5 @@ testImage = cv2.imread(args.testImg)
 rmseImages = rmse(testImage, gndImage)
 sreImages = sre(testImage, gndImage)
 
-print("Root Mean Squared: " + str(rmseImages) + ", Signal to Reconstruction: " + str(sreImages))
+print("RMS,StR")
+print(str(rmseImages) + "," + str(sreImages))
