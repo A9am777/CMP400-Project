@@ -1,4 +1,4 @@
-set ProgramFlags=--of=1 --sw=0 --dr=1 --so=1 --eaf=1 --sg=0 --ap
+set ProgramFlags=--of=1 --sw=0 --dr=1 --eaf=1 --sg=0 --ap
 set MinWaitTime=5
 set MaxWaitTime=6
 set Output=Resolution.csv
