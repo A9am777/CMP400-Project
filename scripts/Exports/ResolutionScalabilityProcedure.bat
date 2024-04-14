@@ -8,7 +8,7 @@ set /A ResolutionMax=4
 :go_again
 echo This is resolution %ResolutionProgress%x%ResolutionProgress%
 
-START Profiler/capture.exe -a 127.0.0.1 -s %MinWaitTime% -o "Result.tracy" -f
+START /min Profiler/capture.exe -a 127.0.0.1 -s %MinWaitTime% -o "Result.tracy" -f
 Haboobo.exe %ProgramFlags% --w=%ResolutionProgress% --h=%ResolutionProgress%
 timeout %MaxWaitTime%
 taskkill /f /IM Haboobo.exe

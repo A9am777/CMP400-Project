@@ -15,7 +15,7 @@ echo Start to loop samples
 echo This is sample number %MarchSampleProgress%
 
 echo Determine latency first
-START Profiler/capture.exe -a 127.0.0.1 -s %MinWaitTime% -o "Result.tracy" -f
+START /min Profiler/capture.exe -a 127.0.0.1 -s %MinWaitTime% -o "Result.tracy" -f
 START /b Haboobo.exe --it=%MarchSampleProgress% %ProgramFlags%
 timeout %MaxWaitTime%
 taskkill /f /IM Haboobo.exe

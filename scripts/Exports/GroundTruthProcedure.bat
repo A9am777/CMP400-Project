@@ -13,7 +13,6 @@ echo Sample Count of... 4?!
 echo Test Low to Ground
 python PyCompareToolApp.py LowSample.png GroundTruth.png
 
-
 echo Test Very Low to Ground
 python PyCompareToolApp.py AbsurdlyLowSample.png GroundTruth.png
 
