@@ -8,7 +8,7 @@ set /A MarchSampleMax=16
 
 echo Capture the 'ground truth'
 Haboobo.exe %ProgramFlags% --it=%MarchSampleMax% --eaf=1 --o="GroundTruth.dds"
-"DXT/texconv.exe" "GroundTruth.dds" -ft png -srgbo -y -wiclossless
+"DXT/texconv.exe" "GroundTruth.dds" -ft png -y -wiclossless
 
 echo Start to loop samples
 :go_again
@@ -33,7 +33,7 @@ python "AppendCSV.py" "Result.csv" %OutputLatency% "Samples" %MarchSampleProgres
 
 echo Now determine convergence
 Haboobo.exe --it=%MarchSampleProgress% %ProgramFlags% --eaf=1 --o="Output.dds"
-"DXT/texconv.exe" "Output.dds" -ft png -srgbo -y -wiclossless
+"DXT/texconv.exe" "Output.dds" -ft png -y -wiclossless
 
 echo Compare to ground truth
 python PyCompareToolApp.py Output.png GroundTruth.png > Result.csv

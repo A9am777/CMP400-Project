@@ -7,7 +7,7 @@ set /A OrbitProgressCount=4
 echo This is position %OrbitDiscreteProgress%
 Haboobo.exe %ProgramFlags% --opi=%OrbitDiscreteProgress%
 
-"DXT/texconv.exe" "Output.dds" -ft png -srgbo -y -wiclossless
+"DXT/texconv.exe" "Output.dds" -ft png -y -wiclossless
 
 echo Lets denoise
 python PyDenoiseToolApp.py Output.png 5 NoNoise.png

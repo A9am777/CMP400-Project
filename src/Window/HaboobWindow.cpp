@@ -143,6 +143,7 @@ namespace Haboob
     // Handle rendering
     {
       TracyD3D11Zone(tcyCtx, "D3DFrame");
+      ZoneScopedN("RenderFrame", true);
       
       imguiFrameBegin();
       renderBegin();
@@ -230,7 +231,7 @@ namespace Haboob
 
   void HaboobWindow::input(float dt)
   {
-    ZoneNamed(Input, true);
+    ZoneScopedN("Input");
 
     if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) { return; }
 
@@ -244,7 +245,7 @@ namespace Haboob
 
   void HaboobWindow::update(float dt)
   {
-    ZoneNamed(Update, true);
+    ZoneScopedN("Update");
 
     fps = 1.f / dt;
 
@@ -292,6 +293,9 @@ namespace Haboob
     // Re-render the haboob on demand
     if (renderHaboob)
     {
+      TracyD3D11Zone(tcyCtx, "D3DHaboobRender");
+      ZoneScopedN("HaboobRender");
+
       haboobVolume.rebuild(device.getDevice().Get());
       haboobVolume.render(device.getContext().Get());
       raymarchShader.getMarchInfo().texelDensity = float(haboobVolume.getVolumeInfo().size.x);
@@ -349,7 +353,7 @@ namespace Haboob
   void HaboobWindow::renderBegin()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameBegin");
-    ZoneNamed(RenderBegin, true);
+    ZoneScopedN("RenderBegin");
 
     // Render to the main target using vanilla settings
     device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
@@ -365,17 +369,25 @@ namespace Haboob
   void HaboobWindow::render()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameScene");
-    ZoneNamed(RenderScene, true);
+    ZoneScopedN("RenderScene");
 
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // Shadowmap pass
-    light.setTarget(context);
-    scene.setCamera(&light.getCamera());
-    scene.draw(context, false);
+    {
+      TracyD3D11Zone(tcyCtx, "D3DExpSM");
+      ZoneScopedN("ExponentialShadowMap");
+
+      light.setTarget(context);
+      scene.setCamera(&light.getCamera());
+      scene.draw(context, false);
+    }
 
     // Generate the BSM
     {
+      TracyD3D11Zone(tcyCtx, "D3DBSM");
+      ZoneScopedN("BeerShadowMap");
+
       // Initial raymarch optimisation passes
       raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&light.getRenderPosition()));
 
@@ -386,33 +398,46 @@ namespace Haboob
     }
 
     // Full pass
-    raymarchShader.getBox()->setVisible(showBoundingBoxes);
-    scene.setCamera(&mainCamera);
-    scene.rebuildCameraBuffer(context);
-    gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
-    
-    
-    if (renderScene)
     {
-      context->PSSetConstantBuffers(0, 1, light.getLightBuffer().GetAddressOf());
-      scene.draw(context);
+      TracyD3D11Zone(tcyCtx, "D3DGBuffer");
+      ZoneScopedN("GBufferPass");
+
+      raymarchShader.getBox()->setVisible(showBoundingBoxes);
+      scene.setCamera(&mainCamera);
+      scene.rebuildCameraBuffer(context);
+      gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
+
+
+      if (renderScene)
+      {
+        context->PSSetConstantBuffers(0, 1, light.getLightBuffer().GetAddressOf());
+        scene.draw(context);
+      }
     }
   }
 
   void HaboobWindow::renderOverlay()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameOverlay");
-    ZoneNamed(RenderOverlay, true);
+    ZoneScopedN("RenderOverlay");
 
     auto context = device.getContext().Get();
 
     scene.setCamera(&mainCamera);
 
     // Basic lit pass
-    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), raymarchShader.getBSMResource(), light.getShadowSampler().Get(), raymarchShader.getMarchBuffer());
+    {
+      TracyD3D11Zone(tcyCtx, "D3DLightPass");
+      ZoneScopedN("LightPass");
+
+      gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), raymarchShader.getBSMResource(), light.getShadowSampler().Get(), raymarchShader.getMarchBuffer());
+    }
 
     // Render the volume
     {
+      TracyD3D11Zone(tcyCtx, "D3DVolumeMarch");
+      ZoneScopedN("VolumeMarch");
+
       // Initial raymarch optimisation passes
       scene.setCamera(&mainCamera);
       raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&mainCamera.getPosition()));
@@ -427,7 +452,7 @@ namespace Haboob
   void HaboobWindow::renderMirror()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameMirror");
-    ZoneNamed(RenderMirror, true);
+    ZoneScopedN("RenderMirror");
 
     auto context = device.getContext().Get();
 
