@@ -1,4 +1,4 @@
-set ProgramFlags=--of=1 --sw=0 --dr=1 --eaf=1 --sg=0 --ap
+set ProgramFlags=--of=1 --sw=0 --dr=1 --eaf=0 --sg=0 --ap
 set MinWaitTime=5
 set MaxWaitTime=6
 set Output=Resolution.csv
@@ -9,7 +9,7 @@ set /A ResolutionMax=4
 echo This is resolution %ResolutionProgress%x%ResolutionProgress%
 
 START /min Profiler/capture.exe -a 127.0.0.1 -s %MinWaitTime% -o "Result.tracy" -f
-Haboobo.exe %ProgramFlags% --w=%ResolutionProgress% --h=%ResolutionProgress%
+START /b Haboobo.exe %ProgramFlags% --w=%ResolutionProgress% --h=%ResolutionProgress%
 timeout %MaxWaitTime%
 taskkill /f /IM Haboobo.exe
 
