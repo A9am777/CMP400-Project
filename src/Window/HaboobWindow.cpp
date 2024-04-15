@@ -250,39 +250,41 @@ namespace Haboob
     fps = 1.f / dt;
 
     // Mirror some shader env macros
-    shaderManager.setMacro("MACRO_MANAGED", "1"); // Signal program is taking control
-
     {
-      auto& marchInfo = raymarchShader.getMarchInfo();
-      shaderManager.setMacro("MARCH_STEP_COUNT", std::to_string(marchInfo.iterations));
-    }
+      shaderManager.setMacro("MACRO_MANAGED", "1"); // Signal program is taking control
 
-    {
-      auto& opticsInfo = raymarchShader.getOpticsInfo();
-      shaderManager.setMacro("APPLY_BEER", std::to_string(opticsInfo.flagApplyBeer));
-      shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
-      shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
-      shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
-      shaderManager.setMacro("APPLY_UPSCALE", std::to_string(upscaleTracing));
-      shaderManager.setMacro("APPLY_BSM", std::to_string(useBSM));
-      shaderManager.setMacro("APPLY_IMPROVE_BSM", std::to_string(useImprovedBSM));
-      shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
-      shaderManager.setMacro("APPLY_SHADOW", std::to_string(useShadows));
-      shaderManager.setMacro("TEXTURE_GRAPH", std::to_string(textureGraph));
-      shaderManager.setMacro("TEXTURE_NORMALS", std::to_string(textureNormals));
-      shaderManager.setMacro("TEXTURE_WHITE", std::to_string(textureWhite));
-    }
+      {
+        auto& marchInfo = raymarchShader.getMarchInfo();
+        shaderManager.setMacro("MARCH_STEP_COUNT", std::to_string(marchInfo.iterations));
+      }
 
-    {
-      shaderManager.setMacro("SHOW_DENSITY", std::to_string(showDensity));
-      shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
-      shaderManager.setMacro("SHOW_SAMPLE_LEVEL", std::to_string(showSampleLevel));
-      shaderManager.setMacro("SHOW_MASK", std::to_string(showMasks));
-      shaderManager.setMacro("SHOW_RAY_TRAVEL", std::to_string(showRayTravel));
-    }
+      {
+        auto& opticsInfo = raymarchShader.getOpticsInfo();
+        shaderManager.setMacro("APPLY_BEER", std::to_string(opticsInfo.flagApplyBeer));
+        shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
+        shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
+        shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
+        shaderManager.setMacro("APPLY_UPSCALE", std::to_string(upscaleTracing));
+        shaderManager.setMacro("APPLY_BSM", std::to_string(useBSM));
+        shaderManager.setMacro("APPLY_IMPROVE_BSM", std::to_string(useImprovedBSM));
+        shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
+        shaderManager.setMacro("APPLY_SHADOW", std::to_string(useShadows));
+        shaderManager.setMacro("TEXTURE_GRAPH", std::to_string(textureGraph));
+        shaderManager.setMacro("TEXTURE_NORMALS", std::to_string(textureNormals));
+        shaderManager.setMacro("TEXTURE_WHITE", std::to_string(textureWhite));
+      }
 
-    shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(15.));
-    shaderManager.setMacro("SHADOW_BIAS", std::to_string(.05));
+      {
+        shaderManager.setMacro("SHOW_DENSITY", std::to_string(showDensity));
+        shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
+        shaderManager.setMacro("SHOW_SAMPLE_LEVEL", std::to_string(showSampleLevel));
+        shaderManager.setMacro("SHOW_MASK", std::to_string(showMasks));
+        shaderManager.setMacro("SHOW_RAY_TRAVEL", std::to_string(showRayTravel));
+      }
+
+      shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(15.));
+      shaderManager.setMacro("SHADOW_BIAS", std::to_string(.05));
+    }
 
     // If macros changed, recompile shaders!
     shaderManager.bakeMacros(device.getDevice().Get());
@@ -705,10 +707,14 @@ namespace Haboob
       auto cameraGroup = (new EnvironmentGroup(new args::Group(argRoot, "Camera")))->setName("Camera");
       root.addChildGroup(cameraGroup);
 
-      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &mainCamera.getPosition().x))
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, 
+        new args::ValueFlagList<float>(*cameraGroup->getArgGroup(), "CameraPos", "Sets the camera position", { "campos" }),
+        &mainCamera.getPosition().x))
         ->setName("Camera Pos")
         ->setGUISettings(1.f, -10.f, 10.f));
-      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float2, nullptr, &mainCamera.getAngles().x))
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float2,
+        new args::ValueFlagList<float>(*cameraGroup->getArgGroup(), "CameraRot", "Sets the camera orientation", { "camrot" }),
+        &mainCamera.getAngles().x))
         ->setName("Camera Rot")
         ->setGUISettings(XM_PI * .01f, -XM_PI, XM_PI));
       cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMoveRate()))
@@ -998,7 +1004,9 @@ namespace Haboob
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplyHG))
         ->setName("Apply HG")
         ->setGUISettings(~0));
-      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplySpectral))
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, 
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplySpectral", "If the spectral model should be used in rendering", { "usl" }), 
+        &opticsInfo.flagApplySpectral))
         ->setName("Apply Spectral")
         ->setGUISettings(~0));
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool, 
