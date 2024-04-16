@@ -1,0 +1,53 @@
+// A simple macro library for raymarching, to directly reuse common functions
+#ifndef MARCHVOLUMEMACROS_H
+#define MARCHVOLUMEMACROS_H
+
+#include "RaymarchCommon.lib"
+
+#ifndef MACRO_MANAGED
+  #define MARCH_MANUAL 0
+  #define MARCH_STEP_COUNT 24
+
+  #define SHOW_DENSITY 0
+  #define SHOW_ANGSTROM 0
+  #define SHOW_SAMPLE_LEVEL 0
+  #define SHOW_MASK 0
+  #define SHOW_RAY_TRAVEL 0
+#endif
+
+// Define the raymarch functions to use
+#define Phase(angularDistance, anisotropicTerms) hgScatter(angularDistance, anisotropicTerms)
+#define Transmission(opticalDepths) bpTransmission(opticalDepths, opticalInfo.powderCoefficient)
+#define Integrator4 SimpsonsIntegrator4
+#define Integrator SimpsonsIntegrator
+
+// Sets up the fragment position and fetches the UAV ray information
+void fetchPixelRayInfo(inout int2 screenPosition, inout float4 rayParams, in int2 threadID, in RWTexture2D<float4> rayInformation)
+{
+  // Fetch the ray parameter per fragment
+  #if APPLY_UPSCALE
+    // Using 1/4 rays over 1/4 of the screen
+    screenPosition = threadID * 2;
+  
+    // Fetch parameters that have been fed in (over the 2x2 pixel area)
+    rayParams = rayInformation[screenPosition];
+    rayParams += rayInformation[screenPosition + int2(1, 0)];
+    rayParams += rayInformation[screenPosition + int2(0, 1)];
+    rayParams += rayInformation[screenPosition + int2(1, 1)];
+    rayParams *= .25;
+  #else
+    // Using all rays over the screen
+    screenPosition = threadID.xy;
+  
+    // Fetch parameters that have been fed in
+    rayParams = rayInformation[screenPosition];
+  #endif
+}
+
+// Returns if the ray params dictate the ray does not need to work (utilising fuzzy logic)
+float isRayMasked(in float4 rayParams)
+{
+  return (rayParams.x < 0 || rayParams.y < 0);
+}
+
+#endif

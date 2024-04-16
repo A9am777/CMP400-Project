@@ -10,6 +10,7 @@ struct InputType
   float2 uv : TEXCOORD0;
 };
 
+// Simple pixel shader for directly mirroring a texture from determined UVs
 float4 main(InputType input) : SV_TARGET
 {
 	// Simply return a sample from the texture

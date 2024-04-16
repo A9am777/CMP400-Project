@@ -77,4 +77,10 @@ float2 screenToTexel(float2 screenspace)
   return float2(signedToNorm(screenspace.x), signedToNorm(-screenspace.y));
 }
 
+// Returns the standard visibility based alpha blend
+float4 alphaBlend(float4 foreground, float4 background)
+{
+  return foreground * foreground.a + (1. - foreground.a) * background;
+}
+
 #endif

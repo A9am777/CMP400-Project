@@ -58,7 +58,7 @@ struct MarchParams
   float initialStep;
   float marchZStep;
   uint iterations;
-  bool mask;
+  uint mask; // Unused, could be used to early exit
 };
 
 struct Ray
@@ -161,6 +161,13 @@ void march(inout Ray ray, float stepSize)
 {
   ray.pos = ray.pos + ray.dir * stepSize;
   ray.travelDistance += stepSize;
+}
+
+// Returns if a ray is within a sphere
+bool inSphere(in Ray ray, in Sphere sphere)
+{
+  float3 displacement = ray.pos.xyz - sphere.pos.xyz;
+  return dot(displacement, displacement) <= sphere.sqrRadius; // dot(x, x) = |x|^2
 }
 
 // Beer-Lambert law
@@ -291,6 +298,31 @@ float2 getBSMOpticalCoefficients(in float4 shadowTerms, in Texture2D<float4> BSM
   #endif
   
   return opticalValues;
+}
+
+// Returns the sample level for cone tracing of a point sampling ray
+float getConeSampleLevel(in Ray ray, float worldToTexels, in MarchVolumeDispatchInfo dispatchInfo)
+{
+  float rayRadius = dispatchInfo.pixelRadius + dispatchInfo.pixelRadiusDelta * ray.travelDistance;
+  #if APPLY_UPSCALE
+    rayRadius *= 2.;
+  #endif
+  return log2(rayRadius * worldToTexels);
+}
+
+// Returns a point sample from a haboob volume at the ray
+float3 haboobCubeDensitySample(in Ray ray, in MarchVolumeDispatchInfo dispatchInfo, in SamplerState volumeSampler, in Texture3D<float3> volumeTexture)
+{
+  // Compute the local coordinates within the cube
+  float4 localPos = mul(float4(ray.pos.xyz, 1.), dispatchInfo.localVolumeTransform);
+  localPos = localPos / localPos.w;
+  localPos.xyz += float3(.5, .5, .5);
+  
+  #if APPLY_CONE_TRACE
+    return volumeTexture.SampleLevel(volumeSampler, localPos.xyz, getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x, dispatchInfo)).rgb;
+  #else
+    return volumeTexture.SampleLevel(volumeSampler, localPos.xyz, .0).rgb;
+  #endif
 }
 
 // Returns the RGB values from CIEXYZ values (with two X wavelets)

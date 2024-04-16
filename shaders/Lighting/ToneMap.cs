@@ -7,6 +7,7 @@ cbuffer ToneValues : register(b0)
 
 RWTexture2D<float4> colourOut : register(u0);
 
+// Reinhard tone mapping
 [numthreads(8, 8, 1)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
