@@ -18,7 +18,7 @@ namespace Haboob
     Window::onStart();
 
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
-    shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
+    shaderManager.setShaderDir(L"shaders");
 
     if (exportPathFlag && exportPathFlag->HasFlag() && exportPathFlag->Matched())
     {
@@ -552,7 +552,7 @@ namespace Haboob
   {
     if (!cameraOrbit) { return; }
 
-    // Pan around a circular orbit utilising parametric eq of circle
+    // Pan around a circular orbit utilising the parametric equation of a circle
     // Note: frame locked for consistent testing results
 
     XMVECTOR lookAtLoad = XMLoadFloat3(&orbitLookAt);

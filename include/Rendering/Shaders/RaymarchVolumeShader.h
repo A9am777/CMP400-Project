@@ -142,6 +142,7 @@ namespace Haboob
     // Mirror from the intermediate to the target buffer
     void mirror(ID3D11DeviceContext* context);
 
+    // Optimise rays based on the currently bound camera and render the information into the ray target
     void optimiseRays(DisplayDevice& device, MeshRenderer<VertexType>& renderer, GBuffer& gbuffer, XMVECTOR& cameraPosition);
 
     // Renders the Beer Shadow Map

@@ -86,7 +86,7 @@ namespace Haboob
 
   HRESULT SimpleSphereMesh::build(ID3D11Device* device, ULong segments, ULong rings)
   {
-    const float radius = .5f * sqrt(3.f);
+    const float radius = .5f * sqrt(3.f); // Fit to a box
     const float xStep = 1.f / (float)segments;
     const float yStep = 1.f / (float)rings;
     const float xAngularStep = XM_2PI / (float)segments;
