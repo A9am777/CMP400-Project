@@ -14,7 +14,7 @@ namespace Haboob
     RenderCopyShader();
     ~RenderCopyShader();
 
-    HRESULT initShader(ID3D11Device* device, const ShaderManager* manager);
+    HRESULT initShader(ID3D11Device* device, ShaderManager* manager);
     void bindShader(ID3D11DeviceContext* context);
 
     void render(ID3D11DeviceContext* context) const;
@@ -24,6 +24,8 @@ namespace Haboob
     inline void setProjectionMatrix(const XMMATRIX& matrix) { matrices.projectionMatrix = matrix; }
     inline void setViewMatrix(const XMMATRIX& matrix) { matrices.viewMatrix = matrix; }
     inline void setWorldMatrix(const XMMATRIX& matrix) { matrices.worldMatrix = matrix; }
+
+    ComPtr<ID3D11SamplerState> getSampler() { return sampler; }
 
     private:
     Shader* vertexShader;

@@ -17,7 +17,19 @@ startProj(Haboobo)
   defineShaders(Haboobo ${HLSL_TYPE_HEADER} "${Shaders_HLSLI}" 1)
 
   target_compile_features(Haboobo PUBLIC cxx_std_17)
-  target_link_libraries(Haboobo WSTRCore ImGui)
+  target_link_libraries(Haboobo WSTRCore ImGui Catch2::Catch2 args Tracy::TracyClient)
+  
+  # Testing
+  include(${CMAKE_CURRENT_LIST_DIR}/scripts/TestCases.cmake)
+
+  # Scripts
+  include(${CMAKE_CURRENT_LIST_DIR}/scripts/ExportScripts.cmake)
+  exportScripts(Haboobo)
+
+  # Unit tests
+  add_custom_command(TARGET Haboobo POST_BUILD
+        COMMAND $<TARGET_FILE_DIR:Haboobo>/TestApp.exe)
+
 endProj(Haboobo)
 
 setMain(Haboobo)

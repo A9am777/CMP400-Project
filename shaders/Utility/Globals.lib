@@ -4,4 +4,83 @@
 // Remove the need to transpose
 #pragma pack_matrix( row_major )
 
+#define IDENTITY_MAT float4x4(1., .0, .0, .0, .0, 1., .0, .0, .0, .0, 1., .0, .0, .0, .0, 1.)
+#define ONE_MAT float4x4(1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.)
+#define FILL_MAT(n) float4x4(n, n, n, n, n, n, n, n, n, n, n, n, n, n, n, n)
+
+#define ONE_VEC float4(1., 1., 1., 1.)
+#define ZERO_VEC float4(.0, .0, .0, .0)
+#define FILL_VEC(n) float4(n, n, n, n)
+
+static float PI = radians(180.);
+static float EULER = exp(.0);
+
+// Returns a diagonal matrix
+float4x4 diagonal(in float4 vec)
+{
+  float4x4 mat = IDENTITY_MAT;
+  mat._11_22_33_44 = vec;
+  
+  return mat;
+}
+float4x4 diagonal(in float val)
+{
+  float4x4 mat = IDENTITY_MAT;
+  mat._11_22_33_44 = float4(val, val, val, val);
+  
+  return mat;
+}
+
+// Returns a blend value for if the position is inside extents (utilising fuzzy logic)
+float insideBox3D(float3 pos, float3 min, float3 max)
+{
+  pos = step(min, pos) * step(pos, max);
+  return all(pos);
+}
+
+// Returns a blend value for if the position is outside extents (utilising fuzzy logic)
+float outsideBox3D(float3 pos, float3 min, float3 max)
+{
+  pos = step(pos, min) + step(max, pos);
+  return any(pos);
+}
+
+// Returns the solution to a quadratic equation
+float3 solveQuadratic(float a, float b, float c)
+{
+  float determinant = b * b - 4 * a * c;
+  float rtDeterminant = sqrt(determinant);
+  return float3(determinant, float2(-b - rtDeterminant, -b + rtDeterminant) / (2 * a));
+}
+
+// Converts [0, 1] to [-1, 1]
+float normToSigned(float norm)
+{
+  return (norm - .5) * 2.;
+}
+
+// Converts [-1, 1] to [0, 1]
+float signedToNorm(float norm)
+{
+  return norm * .5 + .5;
+}
+
+// Divides by the w component
+void fromHomogeneous(inout float4 vec)
+{
+  vec = vec / vec.w;
+}
+
+// Converts from screen space to texel space
+float2 screenToTexel(float2 screenspace)
+{
+  return float2(signedToNorm(screenspace.x), signedToNorm(-screenspace.y));
+}
+
+// Returns the standard visibility based alpha blend
+float4 alphaBlend(float4 foreground, float4 background)
+{
+  return foreground * foreground.a + (1. - foreground.a) * background;
+}
+
 #endif

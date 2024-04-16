@@ -1,12 +1,13 @@
-#include "Rendering/Shaders/Shader.h"
+#include "Rendering/Shaders/ShaderManager.h"
 
 namespace Haboob
 {
-  Shader::Shader(Type shaderType, const wchar_t* path)
+  Shader::Shader(Type shaderType, const wchar_t* path, bool precompiled)
   {
     type = shaderType;
     relativePath = path;
     compiledShader = nullptr;
+    preferCompiled = precompiled;
   }
 
   Shader::~Shader()
@@ -16,6 +17,13 @@ namespace Haboob
       compiledShader->Release();
       compiledShader = nullptr;
     }
+  }
+
+  HRESULT Shader::initShader(ID3D11Device* device, ShaderManager* manager)
+  {
+    manager->addShader(this);
+
+    return initShader(device, (const ShaderManager*)manager);
   }
 
   HRESULT Shader::initShader(ID3D11Device* device, const ShaderManager* manager)
@@ -90,7 +98,17 @@ namespace Haboob
 
     // Load the raw shader file
     ComPtr<ID3DBlob> shaderBlob;
-    result = manager->loadShaderBlob(relativePath, shaderBlob.GetAddressOf());
+    if (preferCompiled)
+    {
+      // For speed of large shaders
+      result = manager->loadPreCompiledShaderBlob(relativePath, shaderBlob.GetAddressOf());
+    }
+    if (!preferCompiled || FAILED(result))
+    {
+      // For lightweight shaders with macros
+      result = manager->loadFormattedShaderBlob(type, relativePath, shaderBlob.GetAddressOf());
+    }
+
     Firebreak(result);
 
     switch (type)

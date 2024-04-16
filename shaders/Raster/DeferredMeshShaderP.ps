@@ -1,6 +1,12 @@
 #include "../Utility/MeshCommon.lib"
 #include "../Lighting/GBuffer.lib"
 
+#ifndef MACRO_MANAGED
+  #define TEXTURE_GRAPH 0
+  #define TEXTURE_NORMALS 0
+  #define TEXTURE_WHITE 1
+#endif
+
 struct InputType
 {
   float4 position : SV_POSITION;
@@ -14,9 +20,25 @@ GBufferOut main(InputType input)
 {
   GBufferOut output;
     
-  output.diffuse.rgb = input.normal * .5 + float3(.5, .5, .5);
+  // Apply a specific global texture
+  #if TEXTURE_GRAPH
+    float gridCount = 40.;
+    float2 unitSpace = fmod(input.uv * gridCount, 1.);
+    unitSpace = float2(1., 1.) - pow(2. * unitSpace - float2(1., 1.), 6.);
+    output.diffuse.rgb = float3(unitSpace.x, unitSpace.y, dot(unitSpace, float2(.7071, .7071)));
+  #elif TEXTURE_WHITE
+    output.diffuse.rgb = float3(1., 1., 1.);
+  #elif TEXTURE_NORMALS
+    output.diffuse.rgb = input.normal * .5 + float3(.5, .5, .5);
+  #else
+    output.diffuse.rgb = input.screenPosition.xyz;
+  #endif
+  
+  // Mirror most information into the buffer
   output.diffuse.a = .0;
-  output.normal = float4(input.normal, input.screenPosition.z); // Pack normal AND z depth
+  output.normal = float4(input.normal, input.position.z); // Pack normal AND z depth
+  output.world.xyz = input.worldPosition;
+  output.world.w = 1.;
   
   return output;
 }

@@ -1,3 +1,4 @@
+#include "Rendering/Shaders/ShaderManager.h"
 #include "Rendering/Textures/GBuffer.h"
 
 namespace Haboob
@@ -12,9 +13,9 @@ namespace Haboob
 
   void GBuffer::setTargets(ID3D11DeviceContext* context, ID3D11DepthStencilView* depthStencil)
   {
-    static constexpr UInt targetCount = 2;
-    ID3D11RenderTargetView* targets[2] = { diffuseTarget.getRenderTarget(), normalDepthTarget.getRenderTarget() };
-    D3D11_VIEWPORT viewports[2] = { diffuseTarget.getViewport(), normalDepthTarget.getViewport() };
+    static constexpr UInt targetCount = 3;
+    ID3D11RenderTargetView* targets[targetCount] = { diffuseTarget.getRenderTarget(), normalDepthTarget.getRenderTarget(), worldPositionTarget.getRenderTarget()};
+    D3D11_VIEWPORT viewports[targetCount] = { diffuseTarget.getViewport(), normalDepthTarget.getViewport(), worldPositionTarget.getViewport() };
 
     context->OMSetRenderTargets(targetCount, targets, depthStencil);
     context->RSSetViewports(targetCount, viewports);
@@ -22,7 +23,7 @@ namespace Haboob
 
   void GBuffer::clear(ID3D11DeviceContext* context)
   {
-    static float normalClearColour[4] = { .0f, .0f, -1.f, .0f };
+    static float normalClearColour[4] = { .0f, .0f, -1.f, 1.f };
 
     diffuseTarget.clear(context, RenderTarget::defaultBlack);
     normalDepthTarget.clear(context, normalClearColour);
@@ -39,6 +40,8 @@ namespace Haboob
     Firebreak(result);
     result = normalDepthTarget.create(device, width, height);
     Firebreak(result);
+    result = worldPositionTarget.create(device, width, height);
+    Firebreak(result);
 
     result = litColourTarget.create(device, width, height);
     Firebreak(result);
@@ -54,6 +57,8 @@ namespace Haboob
     Firebreak(result);
     result = normalDepthTarget.resize(device, width, height);
     Firebreak(result);
+    result = worldPositionTarget.resize(device, width, height);
+    Firebreak(result);
 
     result = litColourTarget.resize(device, width, height);
     Firebreak(result);
@@ -61,21 +66,27 @@ namespace Haboob
     return result;
   }
 
-  void GBuffer::lightPass(ID3D11DeviceContext* context, ID3D11Buffer* lightbuffer)
+  void GBuffer::lightPass(ID3D11DeviceContext* context, ID3D11Buffer* lightbuffer, ID3D11Buffer* lightCameraBuffer, ID3D11ShaderResourceView* lightShadowMap, ID3D11ShaderResourceView* beerShadowMap, ID3D11SamplerState* shadowSampler, ID3D11Buffer* marchBuffer)
   {
-    ID3D11ShaderResourceView* textureResources[2] = { diffuseTarget.getShaderView(), normalDepthTarget.getShaderView() };
+    ID3D11ShaderResourceView* textureResources[5] = { diffuseTarget.getShaderView(), normalDepthTarget.getShaderView(), worldPositionTarget.getShaderView(), lightShadowMap, beerShadowMap};
     ID3D11UnorderedAccessView* outTarget = litColourTarget.getComputeView();
     
-    context->CSSetShaderResources(0, 2, textureResources);
+    context->CSSetSamplers(0, 1, &shadowSampler);
+    context->CSSetShaderResources(0, 5, textureResources);
     context->CSSetUnorderedAccessViews(0, 1, &outTarget, nullptr);
-    lightShader.bindShader(context, lightbuffer);
-      Shader::dispatch(context, litColourTarget.getWidth(), litColourTarget.getHeight());
+    context->CSSetConstantBuffers(2, 1, &marchBuffer);
+    lightShader.bindShader(context, lightbuffer, lightCameraBuffer);
+      Shader::dispatch(context, 1 + litColourTarget.getWidth() / 8, 1 + litColourTarget.getHeight() / 8);
     lightShader.unbindShader(context);
 
     std::memset(textureResources, 0, sizeof(textureResources));
     outTarget = nullptr;
-    context->CSSetShaderResources(0, 2, textureResources);
+    shadowSampler = nullptr;
+    marchBuffer = nullptr;
+    context->CSSetSamplers(0, 1, &shadowSampler);
+    context->CSSetShaderResources(0, 5, textureResources);
     context->CSSetUnorderedAccessViews(0, 1, &outTarget, nullptr);
+    context->CSSetConstantBuffers(2, 1, &marchBuffer);
   }
 
   void GBuffer::finalLitPass(ID3D11DeviceContext* context)
@@ -84,7 +95,7 @@ namespace Haboob
     toneMapShader.setExposure(exposure);
 
     toneMapShader.bindShader(context, litColourTarget.getComputeView());
-      Shader::dispatch(context, litColourTarget.getWidth(), litColourTarget.getHeight());
+      Shader::dispatch(context, 1 + litColourTarget.getWidth() / 8, 1 + litColourTarget.getHeight() / 8);
     toneMapShader.unbindShader(context);
   }
 
@@ -93,7 +104,12 @@ namespace Haboob
     litColourTarget.renderFrom(context);
   }
 
-  HRESULT ToneMapShader::initShader(ID3D11Device* device, const ShaderManager* manager)
+  HRESULT GBuffer::capture(const std::wstring& path, ID3D11DeviceContext* context)
+  {
+    return DirectX::SaveDDSTextureToFile(context, litColourTarget.getTexture(), path.c_str());
+  }
+
+  HRESULT ToneMapShader::initShader(ID3D11Device* device, ShaderManager* manager)
   {
     HRESULT result = S_OK;
     
@@ -141,10 +157,11 @@ namespace Haboob
     context->CSSetConstantBuffers(0, 1, (ID3D11Buffer**)&nullpo);
   }
 
-  void LightPassShader::bindShader(ID3D11DeviceContext* context, ID3D11Buffer* lightbuffer)
+  void LightPassShader::bindShader(ID3D11DeviceContext* context, ID3D11Buffer* lightbuffer, ID3D11Buffer* lightCameraBuffer)
   {
     Shader::bindShader(context);
     context->CSSetConstantBuffers(0, 1, &lightbuffer);
+    context->CSSetConstantBuffers(1, 1, &lightCameraBuffer);
   }
 
   void LightPassShader::unbindShader(ID3D11DeviceContext* context)

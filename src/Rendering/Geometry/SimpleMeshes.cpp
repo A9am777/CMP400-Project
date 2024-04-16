@@ -9,34 +9,34 @@ namespace Haboob
     {
       // Back
       {{-scale, -scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
-      {{scale, -scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
-      {{scale, scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
-      {{-scale, scale, -scale}, {.0f, .0f}, {.0f, .0f, -1.f}},
+      {{scale, -scale, -scale}, {1.f, .0f}, {.0f, .0f, -1.f}},
+      {{scale, scale, -scale}, {1.f, 1.f}, {.0f, .0f, -1.f}},
+      {{-scale, scale, -scale}, {.0f, 1.f}, {.0f, .0f, -1.f}},
       // Bottom
       {{scale, -scale, -scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
-      {{-scale, -scale, -scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
-      {{-scale, -scale, scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
-      {{scale, -scale, scale}, {.0f, .0f}, {.0f, -1.f, 0.f}},
+      {{-scale, -scale, -scale}, {1.f, .0f}, {.0f, -1.f, 0.f}},
+      {{-scale, -scale, scale}, {1.f, 1.f}, {.0f, -1.f, 0.f}},
+      {{scale, -scale, scale}, {.0f, 1.f}, {.0f, -1.f, 0.f}},
       // Right
       {{scale, -scale, -scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
-      {{scale, -scale, scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
-      {{scale, scale, scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
-      {{scale, scale, -scale}, {.0f, .0f}, {1.f, 0.f, 0.f}},
+      {{scale, -scale, scale}, {1.f, .0f}, {1.f, 0.f, 0.f}},
+      {{scale, scale, scale}, {1.f, 1.f}, {1.f, 0.f, 0.f}},
+      {{scale, scale, -scale}, {.0f, 1.f}, {1.f, 0.f, 0.f}},
       // Front
       {{-scale, -scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
-      {{scale, -scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
-      {{scale, scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
-      {{-scale, scale, scale}, {.0f, .0f}, {.0f, .0f, 1.f}},
+      {{scale, -scale, scale}, {1.f, .0f}, {.0f, .0f, 1.f}},
+      {{scale, scale, scale}, {1.f, 1.f}, {.0f, .0f, 1.f}},
+      {{-scale, scale, scale}, {.0f, 1.f}, {.0f, .0f, 1.f}},
       // Top
       {{scale, scale, -scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
-      {{-scale, scale, -scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
-      {{-scale, scale, scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
-      {{scale, scale, scale}, {.0f, .0f}, {.0f, 1.f, 0.f}},
+      {{-scale, scale, -scale}, {1.f, .0f}, {.0f, 1.f, 0.f}},
+      {{-scale, scale, scale}, {1.f, 1.f}, {.0f, 1.f, 0.f}},
+      {{scale, scale, scale}, {.0f, 1.f}, {.0f, 1.f, 0.f}},
       // Left
       {{-scale, -scale, -scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}},
-      {{-scale, -scale, scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}},
-      {{-scale, scale, scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}},
-      {{-scale, scale, -scale}, {.0f, .0f}, {-1.f, 0.f, 0.f}}
+      {{-scale, -scale, scale}, {1.f, .0f}, {-1.f, 0.f, 0.f}},
+      {{-scale, scale, scale}, {1.f, 1.f}, {-1.f, 0.f, 0.f}},
+      {{-scale, scale, -scale}, {.0f, 1.f}, {-1.f, 0.f, 0.f}}
     };
 
     static const std::vector<ULong> indices =
@@ -86,7 +86,7 @@ namespace Haboob
 
   HRESULT SimpleSphereMesh::build(ID3D11Device* device, ULong segments, ULong rings)
   {
-    static constexpr float radius = 1.f;
+    const float radius = .5f * sqrt(3.f); // Fit to a box
     const float xStep = 1.f / (float)segments;
     const float yStep = 1.f / (float)rings;
     const float xAngularStep = XM_2PI / (float)segments;

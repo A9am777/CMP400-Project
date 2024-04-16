@@ -1,9 +1,12 @@
-#include "RaymarchCommon.lib"
 #include "../Lighting/LightStructs.lib"
+#include "MarchVolumeMacros.lib"
 
 RWTexture2D<float4> screenOut : register(u0);
-Texture3D<float4> volumeTexture : register(t0);
+Texture3D<float3> volumeTexture : register(t0);
+Texture2D<float4> directShadowTexture : register(t1);
+Texture2D<float4> beerMapTexture : register(t2);
 SamplerState volumeSampler : register(s0);
+SamplerState shadowSampler : register(s1);
 
 cbuffer CameraSlot : register(b0)
 {
@@ -21,145 +24,43 @@ cbuffer LightSlot : register(b2)
   DirectionalLight light;
 }
 
-// Converts [0, 1] to [-1, 1]
-float normToSigned(float norm)
+cbuffer LightCameraSlot : register(b3)
 {
-  return (norm - .5) * 2.;
+  CameraBuffer lightCamera;
 }
 
-void fromHomogeneous(inout float4 vec)
-{
-  vec = vec / vec.w;
-}
-
-void march(inout Ray ray, float stepSize)
-{
-  ray.pos = ray.pos + ray.dir * stepSize;
-}
-
-void append(inout Integrator inte, float value, uint index)
-{
-  inte.lastTerm = value;
-  if (index % 2 == 0)
-  {
-    inte.evens += value;
-  }
-  else
-  {
-    inte.odds += value;
-  }
-}
-
-float integrate(inout Integrator inte, uint sampleCount)
-{
-  // Note: sample count must always be even
-  float stepSize = 1. / float(sampleCount);
-  float result = inte.firstTerm + inte.lastTerm;
-  result += 4. * inte.odds;
-  result += 2 * (inte.evens - inte.lastTerm);
-  return result * stepSize / 3.;
-}
-
-float3 solveQuadratic(float a, float b, float c)
-{
-  float determinant = b * b - 4 * a * c;
-  float rtDeterminant = sqrt(determinant);
-  return float3(determinant, float2(-b - rtDeterminant, -b + rtDeterminant) / (2 * a));
-}
-
-// Compute the optimal march params for this sphere
-void determineSphereParams(inout MarchParams params, in Ray ray, in Sphere sphere)
-{
-  // Compute intersection(s)
-  float3 result;
-  {
-    float3 translation = ray.pos.xyz - sphere.pos.xyz;
-    float a = dot(ray.dir.xyz, ray.dir.xyz);
-    float b = 2. * dot(translation, ray.dir.xyz);
-    float c = dot(translation, translation) - sphere.sqrRadius;
-  
-    result = solveQuadratic(a, b, c);
-  }
-  
-  params.mask = result.x < .0;
-  params.initialStep = max(result.y, .0); // Do NOT step if currently inside volume
-  params.marchZStep = (result.z - params.initialStep) / float(params.iterations);
-}
-
-bool inSphere(in Ray ray, in Sphere sphere)
-{
-  float3 displacement = ray.pos.xyz - sphere.pos.xyz;
-  return dot(displacement, displacement) <= sphere.sqrRadius; // dot(x, x) = |x|^2
-}
-
-float sphereDensitySample(in Ray ray, in Sphere sphere)
-{
-  float3 displacement = ray.pos.xyz - sphere.pos.xyz;
-  return max(sphere.sqrRadius - dot(displacement, displacement), 0.) / sphere.sqrRadius; // dot(x, x) = |x|^2
-}
-
-float cubeDensitySample(in Ray ray, in Cube cube)
-{
-  // Compute the local coordinates within the cube (TODO: use matrix)
-  float3 localPos = ray.pos.xyz - cube.pos.xyz;
-  localPos.xyz = localPos.xyz / cube.size;
-  
-  return volumeTexture.SampleLevel(volumeSampler, localPos, .5);
-}
-
-// Beer-Lambert law
-float beerLambertAttenuation(float opticalDepth)
-{
-  return opticalInfo.flagApplyBeer ? exp(-opticalDepth) : 1.;
-}
-
-// Henyey-Greenstein scattering function
-float hgScatter(float angularDistance, float gCoeff)
-{
-  static float intCoeff = 1. / (4. * PI);
-  float numerator = 1. - gCoeff * gCoeff;
-  float denominator = 1. + gCoeff * gCoeff - 2. * gCoeff * angularDistance;
-  
-  return opticalInfo.flagApplyHG ? numerator * intCoeff / pow(denominator, 1.5) : 1.;
-}
-
-float hgScatter(in float3 viewDir, in float3 lightDir, float gCoeff)
-{
-  float angular = dot(viewDir, -lightDir); // cos angle
-  return hgScatter(angular, gCoeff);
-}
-
-float3 applyScatter(in float3 colour, float angularDistance)
-{
-  return colour * float3(
-    hgScatter(angularDistance, opticalInfo.colourHGScatter.r),
-    hgScatter(angularDistance, opticalInfo.colourHGScatter.g),
-    hgScatter(angularDistance, opticalInfo.colourHGScatter.b));
-}
-
-float3 applyScatter(in float3 colour, in float3 viewDir, in float3 lightDir)
-{
-  float angular = dot(viewDir, -lightDir); // cos angle
-  return applyScatter(colour, angular);
-}
-
-float4 alphaBlend(float4 foreground, float4 background)
-{
-  return foreground * foreground.a + (1. - foreground.a) * background;
-}
-
-[numthreads(1, 1, 1)]
+[numthreads(16, 16, 1)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
-  // Actually a matrix is probably better here, maybe even rasterisation pass?
-  float2 normScreen = float2(normToSigned((float(threadID.x) + .5f) * dispatchInfo.outputHorizontalStep),
-                              -normToSigned((float(threadID.y) + .5f) * dispatchInfo.outputVerticalStep));
+  int2 screenPosition;
+  float4 rayParams;
+  fetchPixelRayInfo(screenPosition, rayParams, threadID.xy, screenOut);
+  
+  // Mask fragments
+  if (isRayMasked(rayParams) > 0) 
+  { 
+    #if SHOW_MASK
+    screenOut[threadID.xy] = float4(100., 100., 100., 1.);
+    #else
+    screenOut[threadID.xy] = float4(.0, .0, .0, 1.);
+    #endif
+    return; 
+  }
+  
+  // Utilise the rasterization pass to fetch screen coordinates
+  float2 normScreen = float2(rayParams.z, rayParams.w);
   
   // Form a ray from the screen
   Ray ray;
-  ray.pos = float4(normScreen, 0, 1.);
+  float rayMaxDepth = .0;
+  
+  // Shadow terms of the ray at each extent (u, v, linear-Z)
+  float4 shadowSpace;
+  float4 deltaShadowSpace;
+  
+  ray.pos = float4(normScreen, rayParams.x, 1.);
   {
-    float4 directionPointTarget = float4(normScreen, ZDirectionTest, 1.);
+    float4 directionPointTarget = float4(normScreen, rayParams.y, 1.);
     
     // Convert both points to world space
     ray.pos = mul(ray.pos, camera.inverseViewProjectionMatrix);
@@ -168,71 +69,137 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     fromHomogeneous(directionPointTarget);
     
     // Create a normalised direction vector
-    ray.dir = normalize(directionPointTarget - ray.pos);
+    ray.dir = directionPointTarget - ray.pos;
+    rayMaxDepth = length(ray.dir);
+    ray.dir /= rayMaxDepth;
+    
+    // Catch the shadow terms
+    shadowSpace = getShadowDependents(ray.pos, lightCamera, light);
+    deltaShadowSpace = getShadowDependents(directionPointTarget, lightCamera, light);
+    deltaShadowSpace -= shadowSpace;
+    deltaShadowSpace /= rayMaxDepth;
   }
   ray.colour = float4(1., 1., 1., 0.);
-  
-  // Bounding sphere
-  Sphere sphere;
-  sphere.pos = float4(0., 0., 0., 1.);
-  
-  // Sampling cube
-  Cube cube;
-  cube.size = float3(3., 3., 3.);
-  cube.pos = float4(sphere.pos.xyz - cube.size * float3(.5,.5,.5), 1.); // Shift from centre origin to AABB
-  
-  sphere.sqrRadius = dot(cube.size * float3(.5, .5, .5), cube.size * float3(.5, .5, .5)); // Encapsulate cube
+  ray.travelDistance = .0;
   
   // Set march params
   MarchParams params;
-  params.iterations = dispatchInfo.iterations * 2; // *Must* be a multiple of 2
-  params.marchZStep = dispatchInfo.marchZStep;
-  params.initialStep = dispatchInfo.initialZStep;
-  params.mask = 0;
-  if (!dispatchInfo.flagManualMarch)
-  {
-    // Use the bounding sphere to approximate better params
-    determineSphereParams(params, ray, sphere);
-  }
-  
-  // Exit now if possible
-  if(params.mask)
-  {
-    return;
-  }
+  params.iterations = dispatchInfo.iterations;
+  params.mask = true;
+  #if MARCH_MANUAL
+    params.marchZStep = dispatchInfo.marchZStep;
+    params.initialStep = dispatchInfo.initialZStep;
+  #else
+    params.initialStep = .0;
+    params.marchZStep = rayMaxDepth / float(params.iterations);
+  #endif
   
   // Jump ray forward
   march(ray, params.initialStep);
   
   // Directional lighting will have a constant phase along the ray
-  float3 incomingIntensity = applyScatter(light.diffuse, ray.dir.xyz, light.direction.xyz);
+  float angularDistance = dot(ray.dir.xyz, -light.direction.xyz);
+  float4 ambientIrradiance = float4(light.diffuse, light.diffuse.r);
+  float4 incomingForwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicForwardTerms) * ambientIrradiance;
+  float4 incomingBackwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicBackwardTerms) * ambientIrradiance;
+  float4 incomingIrradianceBlend = lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms);
+  ambientIrradiance *= float4(light.ambient, light.ambient.r) * opticalInfo.ambientFraction;
   
-  Integrator absorptionInte;
-  absorptionInte.firstTerm = absorptionInte.odds = absorptionInte.evens = absorptionInte.lastTerm = .0;
-  Integrator intensityInte;
-  intensityInte.firstTerm = intensityInte.odds = intensityInte.evens = intensityInte.lastTerm = .0;
+  // Integrated optical depth and angstrom
+  Integrator absorptionInte = { 0, 0, 0, 0, 0 };
+  Integrator angstromInte = { 0, 0, 0, 0, 0 };
   
-  [loop] // Yeah need to consider this impact
+  // Integrated spectral CIE X1_Y_Z_X2
+  Integrator4 irradianceInte;
+  irradianceInte.count = 0;
+  irradianceInte.termBuckets[0] = irradianceInte.termBuckets[1] = irradianceInte.firstTerms = irradianceInte.lastTerms = ZERO_VEC;
+  
+  // Must not unroll due to iterative sampling
+  [loop]
   for (uint i = 0; i < params.iterations; ++i)
   {
-    // The true index within simpson's integral
-    uint sampleInteIndex = i + 1;
+    // Accumulate absorption from density
+    {
+      float3 haboobSample = haboobCubeDensitySample(ray, dispatchInfo, volumeSampler, volumeTexture);
+      float densitySample = haboobSample.x;
+      float densityMaxSample = haboobSample.y;
+      float angstromSample = haboobSample.z;
     
-    // Accumulate density
-    float densitySample = opticalInfo.densityCoefficient * cubeDensitySample(ray, cube);
-    append(absorptionInte, densitySample, sampleInteIndex);
+      append(absorptionInte, densitySample);
+      append(angstromInte, angstromSample);
+    }
     
-    // Accumulate intensity as a function of density
-    // (note: simpsons rule is broken here due to odd sample count integration, however it appears more stable to allow this)
-    float intensitySample = densitySample * beerLambertAttenuation(integrate(absorptionInte, sampleInteIndex) * opticalInfo.attenuationFactor);
-    append(intensityInte, intensitySample, sampleInteIndex);
+    // Linearly interpolate geometric shadow information
+    float4 shadowTerms = shadowSpace + deltaShadowSpace * ray.travelDistance;
+    
+    // Integrate the direct optical depth + angstrom along the ray
+    float referenceOpticalDepth = opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance);
+    float referenceAngstrom = opticalInfo.absorptionAngstromExponent * integrate(angstromInte, ray.travelDistance);
+    
+    // Determine the integrated optical depth + angstrom value along the incoming light ray according to the BSM
+    #if APPLY_BSM
+      float2 bsmValues = getBSMOpticalCoefficients(shadowTerms, beerMapTexture, shadowSampler);
+    
+      float referenceScatterOpticalDepth = bsmValues.x;
+      float referenceScatterAngstrom = bsmValues.y;
+    #else
+      float referenceScatterOpticalDepth = opticalInfo.attenuationFactor * EULER;
+      float referenceScatterAngstrom = opticalInfo.scatterAngstromExponent * EULER;
+    #endif
+    
+    // Determine the direct exponential shadow map value
+    float shadowValue = getExponentialShadowCoefficient(shadowTerms, directShadowTexture, shadowSampler);
+    
+    // Accumulate intensity as a function of optical thickness
+    {
+      float4 directIrradiance = ambientIrradiance + shadowValue * incomingIrradianceBlend;
+      #if APPLY_SPECTRAL
+        // Cache the wavelength matrix
+        float4x4 wavelengths = getSpectralWavelengths(opticalInfo);
+      
+        // Compute falloff per wavelength
+        float4x4 transmissions = Transmission(referenceOpticalDepth * spectralScatter(wavelengths, referenceAngstrom)) * Transmission(referenceScatterOpticalDepth  * spectralScatter(wavelengths, referenceScatterAngstrom));
+      
+        // Determine weighted transmission of irradiance across wavelengths
+        float4x4 integratorRadiance = mul(diagonal(directIrradiance), transmissions) * opticalInfo.spectralWeights;
+      
+        // Sum up all wavelength contributions
+        float4 irradianceSample = mul(integratorRadiance, ONE_VEC);
+      #else
+        float4 irradianceSample = Transmission(referenceOpticalDepth) * Transmission(referenceScatterOpticalDepth) * directIrradiance;
+      #endif
+      
+      append4(irradianceInte, irradianceSample);
+    }
     
     // March again!
     march(ray, params.marchZStep);
   }
   
-  // Apply scattering to incoming background irradiance
-  screenOut[threadID.xy] *= beerLambertAttenuation(integrate(absorptionInte, params.iterations) * opticalInfo.attenuationFactor);
-  // Add scattering from the volume itself
-  screenOut[threadID.xy] += float4(integrate(intensityInte, params.iterations) * incomingIntensity, 0.);
+  // Debug/testing outputs
+  #if SHOW_DENSITY
+    screenOut[threadID.xy] = float4(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance), .0, .0, 1.);
+    return;
+  #elif SHOW_ANGSTROM
+    screenOut[threadID.xy] = float4(opticalInfo.absorptionAngstromExponent * integrate(angstromInte, ray.travelDistance), .0, .0, 1.);
+    return;
+  #elif SHOW_SAMPLE_LEVEL
+    float4 sampleLevelInfo = float4(.0, getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x), .0, 1.);
+    ray.travelDistance = params.initialStep;
+    sampleLevelInfo.x = getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x);
+    screenOut[threadID.xy] = sampleLevelInfo / 8.;
+    return;
+  #elif SHOW_RAY_TRAVEL
+    screenOut[threadID.xy] = float4(ray.travelDistance, 1., 1., 1.);
+    return;
+  #endif
+  
+  // Background transmission, assume uniform behaviour across wavelengths (use Beer-Lambert over powder)
+  float finalTransmission = blTransmission(opticalInfo.attenuationFactor * integrate(absorptionInte, ray.travelDistance));
+  
+  // Determine final colour
+  float3 finalIrradiance = spectralToRGB(integrate4(irradianceInte, ray.travelDistance), opticalInfo.spectralToRGB);
+  
+  // Set as irradiance from the volume with alpha = background transmission
+  screenOut[threadID.xy] = float4(finalIrradiance, finalTransmission);
 }

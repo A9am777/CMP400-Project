@@ -1,0 +1,30 @@
+#include "../Utility/Globals.lib"
+#include "../Utility/MeshCommon.lib"
+#include "../Lighting/GBuffer.lib"
+
+struct InputType
+{
+  float4 position : SV_POSITION;
+  float4 screenPosition : POSITION0; // Actually normalised device coords
+  float2 uv : TEXCOORD0;
+  float3 normal : NORMAL;
+  float3 worldPosition : POSITION1;
+};
+
+Texture2D normalDepthTexture : register(t0);
+SamplerState sampler0 : register(s0);
+
+// This shader masks the backface of a bounding box and additively 'appends' the extreme depth
+float4 main(InputType input) : SV_Target
+{
+  float4 output = float4(-1., 1., 1., 1.);
+  
+  // Either the existing depth or bound extremity
+  output.g = min(input.position.z, normalDepthTexture.Sample(sampler0, screenToTexel(input.screenPosition.xy)).w);
+  
+  // It is beneficial to utilise a rasterized screen position for raymarching
+  // (this shader always passes so this operation is performed here over the front facing pass)
+  output.b = input.screenPosition.x;
+  output.a = input.screenPosition.y;
+  return output;
+}
