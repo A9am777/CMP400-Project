@@ -1,5 +1,7 @@
 #include "Rendering/Shaders/ShaderManager.h"
+#include "Rendering/Geometry/MeshRendererImpl.h"
 #include "Rendering/Shaders/RaymarchVolumeShader.h"
+
 #include <cmath>
 
 #undef min
@@ -190,7 +192,6 @@ namespace Haboob
     ID3D11SamplerState* sampler = copyShader.getSampler().Get();
     context->CSSetSamplers(0, 1, &sampler);
 
-    // TODO
     ID3D11ShaderResourceView* rayResourceTexture = rayTarget.getShaderView();
     context->CSSetShaderResources(0, 1, &rayResourceTexture);
 
@@ -359,7 +360,7 @@ namespace Haboob
       return (abscissas - distributionCoefficients[3]) / distributionCoefficients[2];
     };
     auto logWeight = [](float abscissas, float distributionCoefficients[4]) -> float {
-      return abs(exp(abscissas / distributionCoefficients[1]) / (distributionCoefficients[1] * distributionCoefficients[2])); //TODO: why the abs???
+      return abs(exp(abscissas / distributionCoefficients[1]) / (distributionCoefficients[1] * distributionCoefficients[2]));
     };
     auto linearWeight = [](float abscissas, float distributionCoefficients[4]) -> float {
       return 1.f / distributionCoefficients[2];

@@ -1,14 +1,10 @@
 #include "../Utility/MeshCommon.lib"
 #include "../Lighting/LightStructs.lib"
+#include "../Lighting/LightCommon.lib"
 
 cbuffer LightSlot : register(b0)
 {
   DirectionalLight light;
-}
-
-float halfLambert(float intensity)
-{
-  return pow(intensity * .5 + .5, 2.);
 }
 
 SimpleColourOutput main(PixelInputType input)

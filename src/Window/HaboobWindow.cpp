@@ -18,7 +18,7 @@ namespace Haboob
     Window::onStart();
 
     shaderManager.setRootDir(CURRENT_DIRECTORY + L"/..");
-    shaderManager.setShaderDir(L"shaders"); // TODO: this can be a program param
+    shaderManager.setShaderDir(L"shaders");
 
     if (exportPathFlag && exportPathFlag->HasFlag() && exportPathFlag->Matched())
     {
@@ -143,6 +143,7 @@ namespace Haboob
     // Handle rendering
     {
       TracyD3D11Zone(tcyCtx, "D3DFrame");
+      ZoneScopedN("RenderFrame", true);
       
       imguiFrameBegin();
       renderBegin();
@@ -230,7 +231,7 @@ namespace Haboob
 
   void HaboobWindow::input(float dt)
   {
-    ZoneNamed(Input, true);
+    ZoneScopedN("Input");
 
     if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) { return; }
 
@@ -244,44 +245,46 @@ namespace Haboob
 
   void HaboobWindow::update(float dt)
   {
-    ZoneNamed(Update, true);
+    ZoneScopedN("Update");
 
     fps = 1.f / dt;
 
     // Mirror some shader env macros
-    shaderManager.setMacro("MACRO_MANAGED", "1"); // Signal program is taking control
-
     {
-      auto& marchInfo = raymarchShader.getMarchInfo();
-      shaderManager.setMacro("MARCH_STEP_COUNT", std::to_string(marchInfo.iterations));
-    }
+      shaderManager.setMacro("MACRO_MANAGED", "1"); // Signal program is taking control
 
-    {
-      auto& opticsInfo = raymarchShader.getOpticsInfo();
-      shaderManager.setMacro("APPLY_BEER", std::to_string(opticsInfo.flagApplyBeer));
-      shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
-      shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
-      shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
-      shaderManager.setMacro("APPLY_UPSCALE", std::to_string(upscaleTracing));
-      shaderManager.setMacro("APPLY_BSM", std::to_string(useBSM));
-      shaderManager.setMacro("APPLY_IMPROVE_BSM", std::to_string(useImprovedBSM));
-      shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
-      shaderManager.setMacro("APPLY_SHADOW", std::to_string(useShadows));
-      shaderManager.setMacro("TEXTURE_GRAPH", std::to_string(textureGraph));
-      shaderManager.setMacro("TEXTURE_NORMALS", std::to_string(textureNormals));
-      shaderManager.setMacro("TEXTURE_WHITE", std::to_string(textureWhite));
-    }
+      {
+        auto& marchInfo = raymarchShader.getMarchInfo();
+        shaderManager.setMacro("MARCH_STEP_COUNT", std::to_string(marchInfo.iterations));
+      }
 
-    {
-      shaderManager.setMacro("SHOW_DENSITY", std::to_string(showDensity));
-      shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
-      shaderManager.setMacro("SHOW_SAMPLE_LEVEL", std::to_string(showSampleLevel));
-      shaderManager.setMacro("SHOW_MASK", std::to_string(showMasks));
-      shaderManager.setMacro("SHOW_RAY_TRAVEL", std::to_string(showRayTravel));
-    }
+      {
+        auto& opticsInfo = raymarchShader.getOpticsInfo();
+        shaderManager.setMacro("APPLY_BEER", std::to_string(opticsInfo.flagApplyBeer));
+        shaderManager.setMacro("APPLY_HG", std::to_string(opticsInfo.flagApplyHG));
+        shaderManager.setMacro("APPLY_SPECTRAL", std::to_string(opticsInfo.flagApplySpectral));
+        shaderManager.setMacro("APPLY_CONE_TRACE", std::to_string(coneTrace));
+        shaderManager.setMacro("APPLY_UPSCALE", std::to_string(upscaleTracing));
+        shaderManager.setMacro("APPLY_BSM", std::to_string(useBSM));
+        shaderManager.setMacro("APPLY_IMPROVE_BSM", std::to_string(useImprovedBSM));
+        shaderManager.setMacro("MARCH_MANUAL", std::to_string(manualMarch));
+        shaderManager.setMacro("APPLY_SHADOW", std::to_string(useShadows));
+        shaderManager.setMacro("TEXTURE_GRAPH", std::to_string(textureGraph));
+        shaderManager.setMacro("TEXTURE_NORMALS", std::to_string(textureNormals));
+        shaderManager.setMacro("TEXTURE_WHITE", std::to_string(textureWhite));
+      }
 
-    shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(15.));
-    shaderManager.setMacro("SHADOW_BIAS", std::to_string(.05));
+      {
+        shaderManager.setMacro("SHOW_DENSITY", std::to_string(showDensity));
+        shaderManager.setMacro("SHOW_ANGSTROM", std::to_string(showAngstrom));
+        shaderManager.setMacro("SHOW_SAMPLE_LEVEL", std::to_string(showSampleLevel));
+        shaderManager.setMacro("SHOW_MASK", std::to_string(showMasks));
+        shaderManager.setMacro("SHOW_RAY_TRAVEL", std::to_string(showRayTravel));
+      }
+
+      shaderManager.setMacro("SHADOW_EXPONENT", std::to_string(15.));
+      shaderManager.setMacro("SHADOW_BIAS", std::to_string(.05));
+    }
 
     // If macros changed, recompile shaders!
     shaderManager.bakeMacros(device.getDevice().Get());
@@ -292,6 +295,9 @@ namespace Haboob
     // Re-render the haboob on demand
     if (renderHaboob)
     {
+      TracyD3D11Zone(tcyCtx, "D3DHaboobRender");
+      ZoneScopedN("HaboobRender");
+
       haboobVolume.rebuild(device.getDevice().Get());
       haboobVolume.render(device.getContext().Get());
       raymarchShader.getMarchInfo().texelDensity = float(haboobVolume.getVolumeInfo().size.x);
@@ -349,7 +355,7 @@ namespace Haboob
   void HaboobWindow::renderBegin()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameBegin");
-    ZoneNamed(RenderBegin, true);
+    ZoneScopedN("RenderBegin");
 
     // Render to the main target using vanilla settings
     device.setRasterState(static_cast<DisplayDevice::RasterFlags>(mainRasterMode));
@@ -365,17 +371,25 @@ namespace Haboob
   void HaboobWindow::render()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameScene");
-    ZoneNamed(RenderScene, true);
+    ZoneScopedN("RenderScene");
 
     ID3D11DeviceContext* context = device.getContext().Get();
 
     // Shadowmap pass
-    light.setTarget(context);
-    scene.setCamera(&light.getCamera());
-    scene.draw(context, false);
+    {
+      TracyD3D11Zone(tcyCtx, "D3DExpSM");
+      ZoneScopedN("ExponentialShadowMap");
+
+      light.setTarget(context);
+      scene.setCamera(&light.getCamera());
+      scene.draw(context, false);
+    }
 
     // Generate the BSM
     {
+      TracyD3D11Zone(tcyCtx, "D3DBSM");
+      ZoneScopedN("BeerShadowMap");
+
       // Initial raymarch optimisation passes
       raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&light.getRenderPosition()));
 
@@ -386,33 +400,46 @@ namespace Haboob
     }
 
     // Full pass
-    raymarchShader.getBox()->setVisible(showBoundingBoxes);
-    scene.setCamera(&mainCamera);
-    scene.rebuildCameraBuffer(context);
-    gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
-    
-    
-    if (renderScene)
     {
-      context->PSSetConstantBuffers(0, 1, light.getLightBuffer().GetAddressOf());
-      scene.draw(context);
+      TracyD3D11Zone(tcyCtx, "D3DGBuffer");
+      ZoneScopedN("GBufferPass");
+
+      raymarchShader.getBox()->setVisible(showBoundingBoxes);
+      scene.setCamera(&mainCamera);
+      scene.rebuildCameraBuffer(context);
+      gbuffer.setTargets(device.getContext().Get(), device.getDepthBuffer());
+
+
+      if (renderScene)
+      {
+        context->PSSetConstantBuffers(0, 1, light.getLightBuffer().GetAddressOf());
+        scene.draw(context);
+      }
     }
   }
 
   void HaboobWindow::renderOverlay()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameOverlay");
-    ZoneNamed(RenderOverlay, true);
+    ZoneScopedN("RenderOverlay");
 
     auto context = device.getContext().Get();
 
     scene.setCamera(&mainCamera);
 
     // Basic lit pass
-    gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), raymarchShader.getBSMResource(), light.getShadowSampler().Get(), raymarchShader.getMarchBuffer());
+    {
+      TracyD3D11Zone(tcyCtx, "D3DLightPass");
+      ZoneScopedN("LightPass");
+
+      gbuffer.lightPass(context, light.getLightBuffer().Get(), light.getLightPerspectiveBuffer().Get(), light.getShaderView(), raymarchShader.getBSMResource(), light.getShadowSampler().Get(), raymarchShader.getMarchBuffer());
+    }
 
     // Render the volume
     {
+      TracyD3D11Zone(tcyCtx, "D3DVolumeMarch");
+      ZoneScopedN("VolumeMarch");
+
       // Initial raymarch optimisation passes
       scene.setCamera(&mainCamera);
       raymarchShader.optimiseRays(device, scene.getMeshRenderer(), gbuffer, XMLoadFloat3(&mainCamera.getPosition()));
@@ -427,7 +454,7 @@ namespace Haboob
   void HaboobWindow::renderMirror()
   {
     TracyD3D11Zone(tcyCtx, "D3DFrameMirror");
-    ZoneNamed(RenderMirror, true);
+    ZoneScopedN("RenderMirror");
 
     auto context = device.getContext().Get();
 
@@ -525,7 +552,7 @@ namespace Haboob
   {
     if (!cameraOrbit) { return; }
 
-    // Pan around a circular orbit utilising parametric eq of circle
+    // Pan around a circular orbit utilising the parametric equation of a circle
     // Note: frame locked for consistent testing results
 
     XMVECTOR lookAtLoad = XMLoadFloat3(&orbitLookAt);
@@ -573,8 +600,8 @@ namespace Haboob
 
     // Controls
     mainCamera.getMoveRate() = 6.f;
-    mainCamera.getPosition() = { -8.42f, .93f, -1.41f };
-    mainCamera.getAngles() = { 1.36f, .1f, .0f };
+    mainCamera.getPosition() = { -.135f, -.475f, 6.345f };
+    mainCamera.getAngles() = { XM_PI, .0f, .0f };
 
     // Camera orbit (frame locked)
     cameraOrbit = false;
@@ -625,10 +652,10 @@ namespace Haboob
       opticsInfo.phaseBlendWeightTerms = { .17f, .11f, .2f, .2f, };
       opticsInfo.scatterAngstromExponent = 2.1f;
 
-      opticsInfo.ambientFraction = { .2f, .2f, .2f, .2f, };
+      opticsInfo.ambientFraction = { .8f, 1.f, 1.f, 1.f, };
       opticsInfo.absorptionAngstromExponent = 2.3f;
       opticsInfo.powderCoefficient = .035f;
-      opticsInfo.attenuationFactor = 14.1f;
+      opticsInfo.attenuationFactor = 16.1f;
     }
 
     raymarchShader.getMarchInfo().iterations = 52;
@@ -680,10 +707,14 @@ namespace Haboob
       auto cameraGroup = (new EnvironmentGroup(new args::Group(argRoot, "Camera")))->setName("Camera");
       root.addChildGroup(cameraGroup);
 
-      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, nullptr, &mainCamera.getPosition().x))
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float3, 
+        new args::ValueFlagList<float>(*cameraGroup->getArgGroup(), "CameraPos", "Sets the camera position", { "campos" }),
+        &mainCamera.getPosition().x))
         ->setName("Camera Pos")
         ->setGUISettings(1.f, -10.f, 10.f));
-      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float2, nullptr, &mainCamera.getAngles().x))
+      cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float2,
+        new args::ValueFlagList<float>(*cameraGroup->getArgGroup(), "CameraRot", "Sets the camera orientation", { "camrot" }),
+        &mainCamera.getAngles().x))
         ->setName("Camera Rot")
         ->setGUISettings(XM_PI * .01f, -XM_PI, XM_PI));
       cameraGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Float, nullptr, &mainCamera.getMoveRate()))
@@ -973,7 +1004,9 @@ namespace Haboob
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplyHG))
         ->setName("Apply HG")
         ->setGUISettings(~0));
-      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, nullptr, &opticsInfo.flagApplySpectral))
+      opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Flags, 
+        new args::ValueFlag<bool>(*opticsGroup->getArgGroup(), "ApplySpectral", "If the spectral model should be used in rendering", { "usl" }), 
+        &opticsInfo.flagApplySpectral))
         ->setName("Apply Spectral")
         ->setGUISettings(~0));
       opticsGroup->addVariable((new EnvironmentVariable(EnvironmentVariable::Type::Bool, 

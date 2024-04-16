@@ -1,19 +1,8 @@
-#include "RaymarchCommon.lib"
 #include "../Lighting/LightStructs.lib"
-
-#ifndef MACRO_MANAGED  
-  #define MARCH_MANUAL 0
-  #define MARCH_STEP_COUNT 24
-
-  #define SHOW_DENSITY 0
-  #define SHOW_ANGSTROM 0
-  #define SHOW_SAMPLE_LEVEL 0
-  #define SHOW_MASK 0
-  #define SHOW_RAY_TRAVEL 0
-#endif
+#include "MarchVolumeMacros.lib"
 
 RWTexture2D<float4> screenOut : register(u0);
-Texture3D<float4> volumeTexture : register(t0);
+Texture3D<float3> volumeTexture : register(t0);
 Texture2D<float4> directShadowTexture : register(t1);
 Texture2D<float4> beerMapTexture : register(t2);
 SamplerState volumeSampler : register(s0);
@@ -40,104 +29,15 @@ cbuffer LightCameraSlot : register(b3)
   CameraBuffer lightCamera;
 }
 
-// Compute the optimal march params for this sphere
-void determineSphereParams(inout MarchParams params, in Ray ray, in Sphere sphere)
-{
-  // Compute intersection(s)
-  float3 result;
-  {
-    float3 translation = ray.pos.xyz - sphere.pos.xyz;
-    float a = dot(ray.dir.xyz, ray.dir.xyz);
-    float b = 2. * dot(translation, ray.dir.xyz);
-    float c = dot(translation, translation) - sphere.sqrRadius;
-  
-    result = solveQuadratic(a, b, c);
-  }
-  
-  params.mask = result.x < .0;
-  params.initialStep = max(result.y, .0); // Do NOT step if currently inside volume
-  params.marchZStep = (result.z - params.initialStep) / float(params.iterations);
-}
-
-bool inSphere(in Ray ray, in Sphere sphere)
-{
-  float3 displacement = ray.pos.xyz - sphere.pos.xyz;
-  return dot(displacement, displacement) <= sphere.sqrRadius; // dot(x, x) = |x|^2
-}
-
-// Returns the sample level for cone tracing
-float getConeSampleLevel(in Ray ray, float worldToTexels)
-{
-  float rayRadius = dispatchInfo.pixelRadius + dispatchInfo.pixelRadiusDelta * ray.travelDistance;
-  #if APPLY_UPSCALE
-  rayRadius *= 2.;
-  #endif
-  return log2(rayRadius * worldToTexels);
-}
-
-float sphereDensitySample(in Ray ray, in Sphere sphere)
-{
-  float3 displacement = ray.pos.xyz - sphere.pos.xyz;
-  return max(sphere.sqrRadius - dot(displacement, displacement), 0.) / sphere.sqrRadius; // dot(x, x) = |x|^2
-}
-
-float cubeDensitySample(in Ray ray, in Cube cube)
-{
-  // Compute the local coordinates within the cube (TODO: use matrix)
-  float3 localPos = ray.pos.xyz - cube.pos.xyz;
-  localPos.xyz = localPos.xyz / cube.size;
-  
-  return volumeTexture.SampleLevel(volumeSampler, localPos, .5).r;
-}
-
-float3 haboobCubeDensitySample(in Ray ray)
-{
-  // Compute the local coordinates within the cube
-  float4 localPos = mul(float4(ray.pos.xyz, 1.), dispatchInfo.localVolumeTransform);
-  localPos = localPos / localPos.w;
-  localPos.xyz += float3(.5, .5, .5);
-  
-  #if APPLY_CONE_TRACE
-    return volumeTexture.SampleLevel(volumeSampler, localPos.xyz, getConeSampleLevel(ray, dispatchInfo.texelDensity / dispatchInfo.volumeSize.x)).rgb;
-  #else
-    return volumeTexture.SampleLevel(volumeSampler, localPos.xyz, .0).rgb;
-  #endif
-}
-
-float4 alphaBlend(float4 foreground, float4 background)
-{
-  return foreground * foreground.a + (1. - foreground.a) * background;
-}
-
-#define Phase(angularDistance, anisotropicTerms) hgScatter(angularDistance, anisotropicTerms)
-#define Transmission(opticalDepths) bpTransmission(opticalDepths, opticalInfo.powderCoefficient)
-#define Integrator4 SimpsonsIntegrator4
-#define Integrator SimpsonsIntegrator
-
 [numthreads(16, 16, 1)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
-  // Fetch the ray parameter per fragment
-  #if APPLY_UPSCALE
-  // Using 1/4 rays over 1/4 of the screen
-  int2 screenPosition = threadID.xy * 2;
-  
-  // Fetch parameters that have been fed in (over the 2x2 pixel area)
-  float4 rayParams = screenOut[screenPosition];
-  rayParams += screenOut[screenPosition + int2(1, 0)];
-  rayParams += screenOut[screenPosition + int2(0, 1)];
-  rayParams += screenOut[screenPosition + int2(1, 1)];
-  rayParams *= .25;
-  #else
-  // Using all rays over the screen
-  int2 screenPosition = threadID.xy;
-  
-  // Fetch parameters that have been fed in
-  float4 rayParams = screenOut[screenPosition];
-  #endif
+  int2 screenPosition;
+  float4 rayParams;
+  fetchPixelRayInfo(screenPosition, rayParams, threadID.xy, screenOut);
   
   // Mask fragments
-  if(rayParams.x < 0 || rayParams.y < 0) 
+  if (isRayMasked(rayParams) > 0) 
   { 
     #if SHOW_MASK
     screenOut[threadID.xy] = float4(100., 100., 100., 1.);
@@ -199,9 +99,11 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   
   // Directional lighting will have a constant phase along the ray
   float angularDistance = dot(ray.dir.xyz, -light.direction.xyz);
-  float4 incomingForwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicForwardTerms) * float4(light.diffuse, light.diffuse.r);
-  float4 incomingBackwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicBackwardTerms) * float4(light.diffuse, light.diffuse.r);
-  float4 ambientIrradiance = opticalInfo.ambientFraction * float4(light.ambient, light.ambient.r) * Phase(1., opticalInfo.anisotropicForwardTerms);
+  float4 ambientIrradiance = float4(light.diffuse, light.diffuse.r);
+  float4 incomingForwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicForwardTerms) * ambientIrradiance;
+  float4 incomingBackwardIrradiance = Phase(angularDistance, opticalInfo.anisotropicBackwardTerms) * ambientIrradiance;
+  float4 incomingIrradianceBlend = lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms);
+  ambientIrradiance *= float4(light.ambient, light.ambient.r) * opticalInfo.ambientFraction;
   
   // Integrated optical depth and angstrom
   Integrator absorptionInte = { 0, 0, 0, 0, 0 };
@@ -218,7 +120,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
   {
     // Accumulate absorption from density
     {
-      float3 haboobSample = haboobCubeDensitySample(ray);
+      float3 haboobSample = haboobCubeDensitySample(ray, dispatchInfo, volumeSampler, volumeTexture);
       float densitySample = haboobSample.x;
       float densityMaxSample = haboobSample.y;
       float angstromSample = haboobSample.z;
@@ -250,7 +152,7 @@ void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThre
     
     // Accumulate intensity as a function of optical thickness
     {
-      float4 directIrradiance = ambientIrradiance + shadowValue * lerp(incomingForwardIrradiance, incomingBackwardIrradiance, opticalInfo.phaseBlendWeightTerms);
+      float4 directIrradiance = ambientIrradiance + shadowValue * incomingIrradianceBlend;
       #if APPLY_SPECTRAL
         // Cache the wavelength matrix
         float4x4 wavelengths = getSpectralWavelengths(opticalInfo);

@@ -32,11 +32,13 @@ Texture2D<float4> beerMapTex : register(t4);
 [numthreads(8, 8, 1)]
 void main(int3 groupThreadID : SV_GroupThreadID, int3 threadID : SV_DispatchThreadID)
 {
+  // Fetch fragment data
   float3 diffuseColour = diffuseTex[threadID.xy].rgb;
   float baseAlpha = diffuseTex[threadID.xy].a;
   float3 normal = normalTex[threadID.xy].rgb;
   float4 world = float4(worldTex[threadID.xy].xyz, 1.);
   
+  // Determine the component-based 'transmission'
   float3 shadowValues = ONE_VEC.xyz;
   #if APPLY_SHADOW
     // Fetch the shadow geometric terms

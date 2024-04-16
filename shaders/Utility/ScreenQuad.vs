@@ -12,6 +12,7 @@ struct OutputType
   float2 uv : TEXCOORD0;
 };
 
+// Simple vertex shader for orthographic quad screen overdraw
 OutputType main(VertexInputType input)
 {
   OutputType output;
