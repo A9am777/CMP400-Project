@@ -21,4 +21,11 @@ python AppendCSV.py "Result.csv" %Output% "Progress" %OrbitDiscreteProgress%
 set /A "OrbitDiscreteProgress = OrbitDiscreteProgress + 1"
 if %OrbitProgressCount% GTR %OrbitDiscreteProgress% goto go_again
 
+echo Notifying completion...
+echo 
+timeout 1
+echo 
+timeout 1
+echo 
+timeout 1
 cmd /k

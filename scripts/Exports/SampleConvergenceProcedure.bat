@@ -44,4 +44,11 @@ python AppendCSV.py "Result.csv" %OutputConvergence% "Samples" %MarchSampleProgr
 set /A "MarchSampleProgress = MarchSampleProgress + 1"
 if %MarchSampleMax% GTR %MarchSampleProgress% goto go_again
 
+echo Notifying completion...
+echo 
+timeout 1
+echo 
+timeout 1
+echo 
+timeout 1
 cmd /k

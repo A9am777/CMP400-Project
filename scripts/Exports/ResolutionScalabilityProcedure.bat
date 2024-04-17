@@ -27,4 +27,11 @@ python "AppendCSV.py" "Result.csv" %Output% "Resolution" %ResolutionProgress%
 set /A "ResolutionProgress = ResolutionProgress + 1"
 if %ResolutionMax% GEQ %ResolutionProgress% goto go_again
 
+echo Notifying completion...
+echo 
+timeout 1
+echo 
+timeout 1
+echo 
+timeout 1
 cmd /k
