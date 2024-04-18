@@ -1,4 +1,4 @@
-set ProgramFlags=--os=.4 --of=1 --sw=0 --w=1024 --h=1024 --dr=1 --so=1 --eaf=1 --sg=0 --o="Output.dds"
+set ProgramFlags=--os=.4 --of=1 --sw=0 --w=1024 --h=1024 --dr=0 --so=1 --eaf=1 --sg=0 --o="Output.dds"
 set Output=Spatial.csv
 set /A OrbitDiscreteProgress=0
 set /A OrbitProgressCount=4

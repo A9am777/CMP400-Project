@@ -1,4 +1,4 @@
-set ProgramFlags=--of=1 --sw=0 --w=1024 --h=1024 --dr=1 --sg=0
+set ProgramFlags=--of=1 --sw=0 --w=1024 --h=1024 --dr=0 --sg=0
 set MinWaitTime=5
 set MaxWaitTime=6
 set OutputConvergence=Convergence.csv
