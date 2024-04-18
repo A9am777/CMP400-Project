@@ -16,7 +16,9 @@ echo This is sample number %MarchSampleProgress%
 
 echo Determine latency first
 START /min Profiler/capture.exe -a 127.0.0.1 -s %MinWaitTime% -o "Result.tracy" -f
+timeout 1
 START /b Haboobo.exe --it=%MarchSampleProgress% %ProgramFlags%
+
 timeout %MaxWaitTime%
 taskkill /f /IM Haboobo.exe
 
