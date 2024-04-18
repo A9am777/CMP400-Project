@@ -1,8 +1,8 @@
 set ProgramFlags=--of=1 --sw=0 --w=1024 --h=1024 --dr=0 --sg=0
 set MinWaitTime=5
 set MaxWaitTime=6
-set OutputConvergence=Convergence.csv
-set OutputLatency=MarchLatency.csv
+set OutputConvergence=StandardConvergence.csv
+set OutputLatency=StandardMarchLatency.csv
 set /A MarchSampleProgress=1
 set /A MarchSampleMax=16
 

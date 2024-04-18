@@ -1,7 +1,7 @@
-set ProgramFlags=--os=.4 --of=1 --sw=0 --w=1024 --h=1024 --dr=0 --so=1 --eaf=1 --sg=0 --o="Output.dds"
-set Output=Spatial.csv
+set ProgramFlags=--os=.01745329252 --of=1 --sw=0 --w=1024 --h=1024 --dr=0 --so=1 --eaf=1 --sg=0 --o="Output.dds"
+set Output=SpatialStandard.csv
 set /A OrbitDiscreteProgress=0
-set /A OrbitProgressCount=4
+set /A OrbitProgressCount=360
 
 :go_again
 echo This is position %OrbitDiscreteProgress%
