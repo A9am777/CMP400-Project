@@ -4,14 +4,16 @@
 - Standard model
 - Without upscaling
 - Without BSM
-- Without shadow maps
+- Without using shadow maps
 - Without spectral
+- At a far distance
 
 ## Convergence With Samples
 - Standard model
 - Without upscaling
 - Without BSM
 - Without using shadow maps
+- Without spectral
 - At a far distance
 
 ## Noise With Orbit
@@ -26,6 +28,3 @@
 ## Resolution Stability
 - Standard model
 - Without upscaling
-- Without BSM
-- Without using shadow maps
-- Without spectral
