@@ -3,9 +3,9 @@ library(latex2exp)
 
 # read the table
 scriptsDir="C:/Users/Adam/source/repos/uni/CMP400-Project/scripts/Analysis/"
-data <- read_csv(paste(scriptsDir, "../../data/GTX1050Ti/Orbit Noise/SpatialNoScene.csv"))
+data <- read_csv(paste0(scriptsDir, "../../data/GTX1050Ti/Orbit Noise/SpatialNoScene.csv"))
 
-png(file=paste(scriptsDir, "OrbitErrorNoScene.png"), 
+png(file=paste0(scriptsDir, "OrbitErrorNoScene.png"), 
 width = 1024, 
 height = 1024, 
 pointsize = 24)
@@ -29,7 +29,7 @@ regression <- nls(y ~ a * sin(b*x + c) + d,
 
 # display and output summary of the fit
 summ = summary(regression)
-capture.output(summ, file = paste(scriptsDir, "OrbitErrorNoScene.txt"))
+capture.output(summ, file = paste0(scriptsDir, "OrbitErrorNoScene.txt"))
 
 # plot predicted line
 prediction <- predict(regression)
