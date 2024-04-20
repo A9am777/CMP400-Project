@@ -13,7 +13,7 @@ pointsize = 24)
 # plot the table
 table <- plot(data$Progress, data$"RMS",
 col=c("black"),
-main = "Percieved Error With Orbit \n (No Scene)",
+main = "Perceived Error With Orbit \n (No Scene)",
 ylab="RMSE",
 xlab="Location (°)",
 pch=3)
