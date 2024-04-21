@@ -30,3 +30,6 @@
 - Without using shadow maps + scene rendering
 - At a far distance + scene rendering
 - Without spectral + scene rendering
+
+## Simple Latency
+- Standard model

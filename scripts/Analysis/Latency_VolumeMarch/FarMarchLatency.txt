@@ -3,18 +3,17 @@ Call:
 lm(formula = y ~ x, data = data)
 
 Residuals:
-   Min     1Q Median     3Q    Max 
--714.4 -352.0 -186.1   81.9 4986.8 
+     Min       1Q   Median       3Q      Max 
+-0.37617 -0.12841 -0.01126  0.11821  0.48722 
 
 Coefficients:
              Estimate Std. Error t value Pr(>|t|)    
-(Intercept) 3453.3657    84.3024  40.964  < 2e-16 ***
-x              3.0080     0.5705   5.273 2.89e-07 ***
+(Intercept) 0.4152686  0.0231665   17.93   <2e-16 ***
+x           0.0120354  0.0001569   76.71   <2e-16 ***
 ---
 Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-Residual standard error: 670.6 on 252 degrees of freedom
-Multiple R-squared:  0.09936,	Adjusted R-squared:  0.09578 
-F-statistic:  27.8 on 1 and 252 DF,  p-value: 2.895e-07
+Residual standard error: 0.1844 on 253 degrees of freedom
+Multiple R-squared:  0.9588,	Adjusted R-squared:  0.9586 
+F-statistic:  5884 on 1 and 253 DF,  p-value: < 2.2e-16
 
-Outliers pruned outside "latency = [0, 10000]"
