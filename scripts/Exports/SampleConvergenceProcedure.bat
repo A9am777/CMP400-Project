@@ -4,7 +4,7 @@ set MaxWaitTime=6
 set OutputConvergence=StandardConvergence.csv
 set OutputLatency=StandardMarchLatency.csv
 set /A MarchSampleProgress=1
-set /A MarchSampleMax=16
+set /A MarchSampleMax=256
 
 echo Capture the 'ground truth'
 Haboobo.exe %ProgramFlags% --it=%MarchSampleMax% --eaf=1 --o="GroundTruth.dds"
