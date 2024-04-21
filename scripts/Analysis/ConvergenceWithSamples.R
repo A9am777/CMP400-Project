@@ -1,4 +1,5 @@
 library(readr)
+library(latex2exp)
 
 # read the table
 scriptsDir="C:/Users/Adam/source/repos/uni/CMP400-Project/scripts/Analysis/"

@@ -1,0 +1,20 @@
+
+Call:
+lm(formula = y ~ x, data = data)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-2416.5 -1503.7  -937.2  -258.1 28446.6 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept) 3989.881    463.309   8.612 7.96e-16 ***
+x             27.376      3.148   8.697 4.46e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 3684 on 252 degrees of freedom
+Multiple R-squared:  0.2309,	Adjusted R-squared:  0.2278 
+F-statistic: 75.64 on 1 and 252 DF,  p-value: 4.462e-16
+
+Outliers pruned outside "latency = [0, 40000]"
