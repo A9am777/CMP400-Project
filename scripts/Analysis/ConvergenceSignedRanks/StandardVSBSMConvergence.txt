@@ -1,0 +1,7 @@
+
+	Wilcoxon signed rank test with continuity correction
+
+data:  data1$RMS and data2$RMS
+V = 680, p-value < 2.2e-16
+alternative hypothesis: true location shift is not equal to 0
+
