@@ -30,7 +30,3 @@
 - Without using shadow maps + scene rendering
 - At a far distance + scene rendering
 - Without spectral + scene rendering
-
-## Resolution Stability
-- Standard model
-- Without upscaling
