@@ -23,6 +23,6 @@ main = "Static Latency",
 sub = paste0("(Range = ", dataRange, ")"),
 ylab="Frame Count",
 xlab="Latency (ms)",
-breaks = 100)
+breaks = 200)
 
 #dev.off()
