@@ -37,7 +37,7 @@ lines(data$Progress, prediction, col='blue')
 
 # display predicted legend
 legend("topleft", 
-legend=c(TeX(r'($y\sim a\cdot\sin(b\cdot x+c)+d$)', bold=FALSE)), 
+legend=c(TeX(r'($y\sim k_1\cdot\sin(k_2\cdot x+k_3)+k_4$)', bold=FALSE)), 
 col=c("blue"), lty=1, cex=0.75)
 
 dev.off()
