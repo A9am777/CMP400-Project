@@ -1,0 +1,16 @@
+
+Formula: y ~ a * sin(b * x + c) + d
+
+Parameters:
+    Estimate Std. Error t value Pr(>|t|)    
+a  9.075e-06  1.490e-07   60.92   <2e-16 ***
+b  3.377e-02  1.660e-04  203.41   <2e-16 ***
+c -3.205e+00  3.302e-02  -97.08   <2e-16 ***
+d  1.123e-05  1.070e-07  104.93   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 2.012e-06 on 356 degrees of freedom
+
+Algorithm "port", convergence message: relative convergence (4)
+

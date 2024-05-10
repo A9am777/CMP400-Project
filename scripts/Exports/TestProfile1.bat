@@ -8,5 +8,5 @@ if not exist "Result.tracy" (
 goto :pending_export
 )
 
-CALL "Profiler/csvexport.exe" "Result.tracy" >Result.csv
+CALL "Profiler/csvgpuexport.exe" "Result.tracy" >Result.csv
 cmd /k

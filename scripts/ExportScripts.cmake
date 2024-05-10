@@ -44,17 +44,18 @@ function(exportScripts target)
          WORKING_DIRECTORY ${trueCopyDir})
 endfunction()
 
-# Once only configuration time
-onceStrict(ExportScriptsConfig)
-
 # Copy relevant scripts to the build directory
 include("${CMGym_DIR}/platform/win/win7.cmake")
-
-# Install required packages
-execute_process(COMMAND ${CMAKE_CURRENT_LIST_DIR}/InstallPy.bat)
 
 set(trueCopyDir "${CMAKE_CURRENT_LIST_DIR}/Exports")
 getDirFiles(ExportBatScripts "${trueCopyDir}" "CMFT_SCRIPT_batch" 1)
 getDirFiles(ExportPyScripts "${trueCopyDir}" "CMFT_SCRIPT_python" 1)
+
 logInf("${ExportBatScripts}")
 logInf("${ExportPyScripts}")
+
+# Once only configuration time
+onceStrict(ExportScriptsConfig)
+
+# Install required packages
+execute_process(COMMAND ${CMAKE_CURRENT_LIST_DIR}/InstallPy.bat)
